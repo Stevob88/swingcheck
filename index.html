@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>SwingCheck</title>
+<meta name="description" content="On-device golf swing analysis with pose estimation. Free, private, offline.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SwingCheck">
+<meta name="theme-color" content="#eaf5fb">
+<meta name="format-detection" content="telephone=no">
+<!-- App icon (inline SVG as data URI; Safari accepts PNG best, so we also generate a PNG at runtime into a <link> below) -->
+<link id="touchIcon" rel="apple-touch-icon" href="">
+<link id="manifestLink" rel="manifest" href="">
+<style>
+:root{
+  --bg:#f2f8fc; --bg2:#e6f2fa; --card:#ffffff; --line:#d5e6f1;
+  --pri:#4aa8e0; --pri-dark:#2a86c2; --pri-soft:#dceefb; --pri-text:#1f5f8b;
+  --good:#2fb36a; --good-soft:#dff5e8; --bad:#e5443a; --bad-soft:#fde5e3;
+  --warn:#f0a500; --warn-soft:#fff2cc; --grey:#aebfc9; --grey-soft:#eef3f6;
+  --txt:#1a2b3a; --muted:#5b7386; --radius:16px; --shadow:0 2px 10px rgba(30,80,120,.08);
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
+body{min-height:100vh;min-height:100dvh}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.01em}
+h1{font-size:24px}h2{font-size:18px}h3{font-size:15px}
+p{margin:0 0 8px}
+small,.muted{color:var(--muted)}
+.hidden{display:none!important}
+
+/* Layout */
+#app{padding:calc(var(--sat) + 10px) 14px calc(var(--sab) + 84px);max-width:640px;margin:0 auto}
+.screen{display:none;animation:fade .18s ease}
+.screen.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin:4px 0 14px}
+.topbar .brand{display:flex;align-items:center;gap:8px}
+.topbar .brand svg{width:28px;height:28px}
+.topbar .chip{max-width:46%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:14px;border:1px solid var(--line)}
+.card.soft{background:var(--bg2);box-shadow:none}
+.row{display:flex;gap:10px;align-items:center}
+.row.between{justify-content:space-between}
+.row.wrap{flex-wrap:wrap}
+.stack>*+*{margin-top:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:12px 18px;border-radius:14px;font-weight:600;background:var(--pri);color:#fff;box-shadow:0 2px 6px rgba(42,134,194,.25);transition:transform .08s,opacity .15s;user-select:none}
+.btn:active{transform:scale(.97)}
+.btn.block{width:100%}
+.btn.secondary{background:var(--pri-soft);color:var(--pri-text);box-shadow:none}
+.btn.ghost{background:transparent;color:var(--pri-text);box-shadow:none;border:1.5px solid var(--line)}
+.btn.good{background:var(--good)}
+.btn.danger{background:var(--bad-soft);color:#b3261e;box-shadow:none}
+.btn.small{min-height:38px;padding:8px 12px;font-size:14px;border-radius:11px}
+.btn.icon{min-width:48px;padding:0 10px}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.iconbtn{width:44px;height:44px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:var(--pri-soft);color:var(--pri-text);font-weight:700}
+
+/* Inputs */
+label.field{display:block;margin-bottom:10px}
+label.field span.lbl{display:block;font-size:13px;color:var(--muted);margin-bottom:4px;font-weight:600}
+input[type=text],input[type=number],select{width:100%;min-height:46px;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;-webkit-appearance:none;appearance:none}
+input[type=number]{font-variant-numeric:tabular-nums}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235b7386' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
+.seg{display:flex;background:var(--grey-soft);border-radius:12px;padding:3px;gap:3px}
+.seg button{flex:1;min-height:40px;border-radius:10px;font-weight:600;color:var(--muted);font-size:14px}
+.seg button.on{background:#fff;color:var(--pri-text);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.toggle{position:relative;width:50px;height:30px;border-radius:15px;background:#cfdde6;transition:background .2s;flex:none}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s}
+.toggle.on{background:var(--good)}
+.toggle.on::after{transform:translateX(20px)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;background:var(--pri-soft);color:var(--pri-text)}
+.chip.good{background:var(--good-soft);color:#1c7a45}
+.chip.bad{background:var(--bad-soft);color:#b3261e}
+.chip.warn{background:var(--warn-soft);color:#8a5b00}
+.chip.grey{background:var(--grey-soft);color:var(--muted)}
+.pill-list{display:flex;flex-wrap:wrap;gap:6px}
+
+/* Bottom nav */
+nav#nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line);display:flex;padding:6px 6px calc(var(--sab) + 6px);z-index:50}
+nav#nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;color:var(--muted);font-size:11px;font-weight:600;border-radius:12px}
+nav#nav button svg{width:24px;height:24px}
+nav#nav button.on{color:var(--pri-dark);background:var(--pri-soft)}
+
+/* Empty state */
+.empty{text-align:center;padding:26px 14px}
+.empty .art{width:96px;height:96px;margin:0 auto 12px;border-radius:28px;background:var(--pri-soft);display:flex;align-items:center;justify-content:center}
+.empty .art svg{width:54px;height:54px}
+.steps{counter-reset:s;text-align:left;margin:14px 0 0;padding:0;list-style:none}
+.steps li{position:relative;padding-left:36px;margin-bottom:10px;color:var(--muted)}
+.steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:0;width:26px;height:26px;border-radius:50%;background:var(--pri-soft);color:var(--pri-text);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+
+/* Progress */
+.progress{height:10px;border-radius:5px;background:var(--grey-soft);overflow:hidden}
+.progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--pri),var(--good));transition:width .15s}
+
+/* Video + overlay */
+.player{position:relative;width:100%;background:#0d1b26;border-radius:var(--radius);overflow:hidden;aspect-ratio:9/12;max-height:62vh}
+.player video,.player canvas{position:absolute;inset:0;width:100%;height:100%}
+.player video{object-fit:contain}
+.player canvas{pointer-events:none}
+.player .phaseTag{position:absolute;top:10px;left:10px;background:rgba(255,255,255,.9);color:var(--pri-text);font-weight:700;font-size:13px;padding:4px 10px;border-radius:999px}
+.player .timeTag{position:absolute;top:10px;right:10px;background:rgba(255,255,255,.9);color:var(--txt);font-size:12px;padding:4px 8px;border-radius:999px;font-variant-numeric:tabular-nums}
+.controls{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:10px}
+.controls .iconbtn{width:46px;height:46px}
+.scrubWrap{position:relative;margin:12px 0 4px;padding:0 4px}
+.scrub{position:relative;height:38px}
+.scrub .track{position:absolute;left:0;right:0;top:15px;height:8px;border-radius:4px;background:var(--grey-soft);overflow:hidden}
+.scrub .track i{position:absolute;top:0;bottom:0;background:var(--pri-soft)}
+.scrub .track i.alt{background:#c9e4f5}
+.scrub .track i.red{background:var(--bad)}
+.scrub .mark{position:absolute;top:8px;width:2px;height:22px;background:var(--pri-dark);border-radius:1px}
+.scrub .mark.lo::after{top:34px}
+.scrub .mark::after{content:attr(data-l);position:absolute;top:24px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;color:var(--pri-text);white-space:nowrap}
+.scrub input[type=range]{position:absolute;left:0;right:0;top:0;width:100%;height:38px;margin:0;-webkit-appearance:none;background:transparent}
+.scrub input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid var(--pri-dark);box-shadow:0 1px 4px rgba(0,0,0,.25);margin-top:0}
+.scrub input[type=range]::-webkit-slider-runnable-track{height:38px;background:transparent}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+
+/* Score */
+.score{display:flex;align-items:center;gap:14px}
+.ring{position:relative;width:84px;height:84px;flex:none}
+.ring canvas{width:84px;height:84px}
+.ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px}
+.phaseScores{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:12px}
+.phaseScores div{text-align:center;font-size:10px;color:var(--muted)}
+.phaseScores b{display:block;font-size:14px;color:var(--txt);margin-bottom:2px}
+.phaseScores .bar{height:6px;border-radius:3px;background:var(--grey-soft);overflow:hidden;margin-bottom:3px}
+.phaseScores .bar i{display:block;height:100%}
+
+/* Faults */
+.fault{display:flex;gap:12px;padding:12px;border-radius:14px;background:var(--bad-soft);margin-bottom:8px;border:1px solid #f7cfcc}
+.fault.warn{background:var(--warn-soft);border-color:#f3e0a3}
+.fault.info{background:var(--pri-soft);border-color:#c5e0f2}
+.fault .dot{width:10px;height:10px;border-radius:50%;background:var(--bad);margin-top:6px;flex:none}
+.fault.warn .dot{background:var(--warn)}
+.fault.info .dot{background:var(--pri)}
+.fault .body{flex:1;min-width:0}
+.fault .title{font-weight:700;font-size:15px}
+.fault .meta{font-size:12px;color:var(--muted);margin:2px 0 4px}
+.fault .fix{font-size:13px}
+.fault .acts{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.fault .acts button{font-size:12px;font-weight:600;padding:6px 10px;border-radius:9px;background:rgba(255,255,255,.7);color:var(--txt)}
+
+/* Compare graphs */
+.graph{margin-bottom:10px}
+.graph canvas{width:100%;height:110px;border-radius:10px;background:#fbfdff;border:1px solid var(--line)}
+.graph .gh{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px}
+
+/* Lists */
+.item{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item .sc{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;flex:none;background:var(--pri-soft);color:var(--pri-text)}
+.item .sc.g{background:var(--good-soft);color:#1c7a45}.item .sc.a{background:var(--warn-soft);color:#8a5b00}.item .sc.r{background:var(--bad-soft);color:#b3261e}
+.item .t{flex:1;min-width:0}
+.item .t b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .t small{display:block}
+
+/* Ranges table */
+.rangeRow{padding:10px 0;border-bottom:1px solid var(--line)}
+.rangeRow:last-child{border-bottom:0}
+.rangeRow .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rangeRow .hd b{font-size:14px}
+.rangeRow .detail{margin-top:8px;display:none}
+.rangeRow.open .detail{display:block}
+table.rt{width:100%;border-collapse:collapse;font-size:12px}
+table.rt th,table.rt td{padding:5px 4px;text-align:center;border-bottom:1px solid var(--line)}
+table.rt th{color:var(--muted);font-weight:600}
+table.rt input{width:54px;min-height:34px;padding:4px;text-align:center;border-radius:8px;font-size:12px}
+.calib{font-size:12px;color:var(--muted)}
+
+/* Modal / sheet */
+.sheetBack{position:fixed;inset:0;background:rgba(20,40,60,.35);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.sheetBack.show{display:flex}
+.sheet{background:#fff;width:100%;max-width:640px;border-radius:22px 22px 0 0;padding:16px 16px calc(var(--sab) + 18px);max-height:86vh;overflow:auto;animation:up .2s ease}
+@keyframes up{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}
+.sheet h2{margin-bottom:10px}
+.toast{position:fixed;left:50%;bottom:calc(var(--sab) + 92px);transform:translateX(-50%);background:#1a2b3a;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center}
+.toast.show{opacity:1}
+.notice{padding:12px 14px;border-radius:12px;background:var(--warn-soft);border:1px solid #f3e0a3;font-size:14px}
+.notice.bad{background:var(--bad-soft);border-color:#f7cfcc}
+.notice.good{background:var(--good-soft);border-color:#bfe8d0}
+.notice.info{background:var(--pri-soft);border-color:#c5e0f2}
+.kv{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.kv:last-child{border-bottom:0}
+.bigstat{font-size:30px;font-weight:800;color:var(--pri-text);line-height:1}
+details summary{cursor:pointer;font-weight:600;color:var(--pri-text);padding:6px 0}
+.trend canvas{width:100%;height:160px}
+code{background:var(--grey-soft);padding:1px 5px;border-radius:5px;font-size:13px}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ================= ANALYSE ================= -->
+<section class="screen active" id="scr-analyse">
+  <div class="topbar">
+    <div class="brand"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" fill="#dceefb"/><path d="M14 33c6-2 10-8 12-16l3 1c-2 9-7 15-14 18z" fill="#2fb36a"/><circle cx="31" cy="14" r="4" fill="#4aa8e0"/><path d="M12 36h24" stroke="#4aa8e0" stroke-width="3" stroke-linecap="round"/></svg><h1>SwingCheck</h1></div>
+    <span class="chip" id="modelChip">Model: loading…</span>
+  </div>
+
+  <!-- Step 1: pick video -->
+  <div id="an-pick">
+    <div class="card empty" id="an-empty">
+      <div class="art"><svg viewBox="0 0 48 48" fill="none"><rect x="6" y="12" width="26" height="24" rx="5" fill="#4aa8e0"/><path d="M32 20l10-5v18l-10-5z" fill="#2a86c2"/><circle cx="19" cy="24" r="5" fill="#fff"/></svg></div>
+      <h2 id="an-emptyTitle">Record your first swing</h2>
+      <p class="muted" id="an-emptySub">Film from face-on or down-the-line, phone in landscape or portrait, whole body in frame.</p>
+      <ol class="steps">
+        <li>Set the phone about 3–4 m away at hip height, whole body in frame.</li>
+        <li>Record a short clip: a second of address, the swing, a second of finish.</li>
+        <li>Tap below to record or pick the clip — analysis runs on your phone.</li>
+      </ol>
+    </div>
+    <label class="btn block" for="fileInput" id="pickBtn">📹 Record or choose a swing video</label>
+    <input type="file" id="fileInput" accept="video/*" capture="environment" class="hidden">
+    <div id="calibHint" class="notice info hidden" style="margin-top:12px"></div>
+  </div>
+
+  <!-- Step 2: setup -->
+  <div id="an-setup" class="hidden">
+    <div class="card">
+      <div class="player" id="setupPlayer" style="aspect-ratio:9/10;max-height:44vh"><video id="setupVideo" playsinline muted preload="metadata"></video></div>
+    </div>
+    <div class="card stack">
+      <div>
+        <span class="lbl muted" style="font-size:13px;font-weight:600">Camera view</span>
+        <div class="seg" id="viewSeg"><button data-v="face">Face-on</button><button data-v="dtl">Down-the-line</button></div>
+        <small id="viewHint">Face-on = camera in front of you. Down-the-line = camera behind your hands looking at the target.</small>
+      </div>
+      <div>
+        <span class="lbl muted" style="font-size:13px;font-weight:600">Handedness</span>
+        <div class="seg" id="handSeg"><button data-h="R">Right-handed</button><button data-h="L">Left-handed</button></div>
+        <small id="handHint">Auto-detected from face-on clips after analysis — you'll be asked to confirm if it disagrees.</small>
+      </div>
+      <label class="field"><span class="lbl">Profile</span><select id="profileSel"></select></label>
+      <label class="row between" style="padding:6px 0"><span>Use this as a <b>reference</b> (good) swing</span><button class="toggle" id="refToggle" type="button" aria-label="reference"></button></label>
+      <button class="btn block good" id="analyseBtn">Analyse swing</button>
+      <button class="btn block ghost" id="cancelSetup">Choose a different video</button>
+    </div>
+  </div>
+
+  <!-- Step 3: processing -->
+  <div id="an-progress" class="hidden">
+    <div class="card">
+      <h2 id="progTitle">Analysing…</h2>
+      <p class="muted" id="progSub">Finding your body in each frame. Keep the app open.</p>
+      <div class="progress"><i id="progBar"></i></div>
+      <div class="row between" style="margin-top:8px"><small id="progPct">0%</small><small id="progFps"></small></div>
+      <button class="btn block ghost" id="progCancel" style="margin-top:12px">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Step 4: result -->
+  <div id="an-result" class="hidden"></div>
+</section>
+
+<!-- ================= HISTORY ================= -->
+<section class="screen" id="scr-history">
+  <div class="topbar"><h1>History</h1><span class="chip" id="histCount"></span></div>
+  <div id="histBody"></div>
+</section>
+
+<!-- ================= CALIBRATE ================= -->
+<section class="screen" id="scr-calibrate">
+  <div class="topbar"><h1>Calibrate</h1><button class="btn small secondary" id="newProfileBtn">+ Profile</button></div>
+  <div class="card">
+    <label class="field"><span class="lbl">Profile</span><select id="calProfileSel"></select></label>
+    <div class="row wrap" id="calProfileActs"></div>
+  </div>
+  <div id="calBody"></div>
+</section>
+
+<!-- ================= SETTINGS ================= -->
+<section class="screen" id="scr-settings">
+  <div class="topbar"><h1>Settings</h1></div>
+  <div id="setBody"></div>
+</section>
+
+</div>
+
+<nav id="nav">
+  <button data-s="analyse" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Analyse</button>
+  <button data-s="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>History</button>
+  <button data-s="calibrate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="#fff"/><circle cx="15" cy="12" r="2" fill="#fff"/><circle cx="8" cy="18" r="2" fill="#fff"/></svg>Calibrate</button>
+  <button data-s="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
+</nav>
+
+<div class="sheetBack" id="sheetBack"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="importInput" accept="application/json,.json" class="hidden">
+<canvas id="workCanvas" class="hidden"></canvas>
+<video id="workVideo" playsinline muted preload="auto" class="hidden"></video>
+
+<script>
+/* =====================================================================
+   SwingCheck — core: utilities, storage, PWA, pose model, frame extraction
+   ===================================================================== */
+'use strict';
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const deg = r => r * 180 / Math.PI;
+const fmt1 = n => (Math.round(n * 10) / 10).toFixed(1);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const dateStr = t => { const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); };
+
+let toastT;
+function toast(msg, ms = 2400) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms); }
+
+/* ---------- Settings (localStorage, small) ---------- */
+const DEFAULT_SETTINGS = {
+  model: 'heavy',        // heavy | full | lite
+  hand: 'R',             // default handedness
+  fps: 30,               // sampling rate
+  maxRes: 720,           // internal processing cap (long side)
+  activeProfile: null,
+  lastView: 'face',
+  // detection thresholds that learn from manual phase corrections
+  det: { moveStart: 0.12, impactFrac: 0.85, settle: 0.10 },
+  showDefaultsNote: true
+};
+let S = loadSettings();
+function loadSettings() {
+  try { const raw = localStorage.getItem('swingcheck.settings'); if (raw) { const o = JSON.parse(raw); return { ...DEFAULT_SETTINGS, ...o, det: { ...DEFAULT_SETTINGS.det, ...(o.det || {}) } }; } } catch (e) { }
+  return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+}
+function saveSettings() { try { localStorage.setItem('swingcheck.settings', JSON.stringify(S)); } catch (e) { } }
+
+/* ---------- IndexedDB ---------- */
+const DB = (() => {
+  let db;
+  function open() {
+    if (db) return Promise.resolve(db);
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('swingcheck', 1);
+      r.onupgradeneeded = e => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains('profiles')) d.createObjectStore('profiles', { keyPath: 'id' });
+        if (!d.objectStoreNames.contains('refs')) { const s = d.createObjectStore('refs', { keyPath: 'id' }); s.createIndex('profile', 'profileId'); }
+        if (!d.objectStoreNames.contains('history')) { const s = d.createObjectStore('history', { keyPath: 'id' }); s.createIndex('profile', 'profileId'); }
+      };
+      r.onsuccess = e => { db = e.target.result; res(db); };
+      r.onerror = e => rej(e.target.error);
+    });
+  }
+  const tx = (store, mode, fn) => open().then(d => new Promise((res, rej) => {
+    const t = d.transaction(store, mode); const s = t.objectStore(store); let out;
+    try { out = fn(s); } catch (err) { rej(err); return; }
+    t.oncomplete = () => res(out && out.result !== undefined ? out.result : out);
+    t.onerror = e => rej(e.target.error); t.onabort = e => rej(e.target.error);
+  }));
+  return {
+    put: (store, v) => tx(store, 'readwrite', s => s.put(v)),
+    get: (store, k) => tx(store, 'readonly', s => s.get(k)),
+    del: (store, k) => tx(store, 'readwrite', s => s.delete(k)),
+    all: store => tx(store, 'readonly', s => s.getAll()),
+    clear: store => tx(store, 'readwrite', s => s.clear())
+  };
+})();
+
+/* ---------- PWA bits: icon + manifest (all inline) ---------- */
+function makeIconPng(size) {
+  const c = document.createElement('canvas'); c.width = c.height = size; const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, size, size); g.addColorStop(0, '#dff0fb'); g.addColorStop(1, '#bfe0f4');
+  x.fillStyle = g; x.fillRect(0, 0, size, size);
+  x.strokeStyle = '#4aa8e0'; x.lineWidth = size * 0.06; x.lineCap = 'round';
+  x.beginPath(); x.moveTo(size * .25, size * .78); x.lineTo(size * .75, size * .78); x.stroke();
+  x.fillStyle = '#2fb36a'; x.beginPath(); x.moveTo(size * .3, size * .7); x.quadraticCurveTo(size * .55, size * .62, size * .56, size * .34); x.lineTo(size * .64, size * .36); x.quadraticCurveTo(size * .6, size * .68, size * .32, size * .76); x.closePath(); x.fill();
+  x.fillStyle = '#4aa8e0'; x.beginPath(); x.arc(size * .66, size * .27, size * .085, 0, Math.PI * 2); x.fill();
+  return c.toDataURL('image/png');
+}
+function setupPWA() {
+  try {
+    const icon = makeIconPng(180);
+    $('#touchIcon').href = icon;
+    const man = { name: 'SwingCheck', short_name: 'SwingCheck', display: 'standalone', start_url: location.href.split('#')[0], background_color: '#f2f8fc', theme_color: '#eaf5fb', icons: [{ src: makeIconPng(192), sizes: '192x192', type: 'image/png' }, { src: makeIconPng(512), sizes: '512x512', type: 'image/png' }] };
+    $('#manifestLink').href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(man));
+  } catch (e) { }
+  // Optional service worker (needs a sibling sw.js file — see Settings > Offline). Silently ignored if absent.
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    fetch('./sw.js', { method: 'HEAD' }).then(r => { if (r.ok && /javascript/.test(r.headers.get('content-type') || '')) return navigator.serviceWorker.register('./sw.js').then(() => { window.__swOK = true; }); }).catch(() => { });
+  }
+}
+
+/* ---------- Asset caching (Cache API in the page, no SW needed) ---------- */
+const CACHE_NAME = 'swingcheck-assets-v1';
+async function cachedFetch(url, onProgress) {
+  let cache = null;
+  try { if (self.caches) cache = await caches.open(CACHE_NAME); } catch (e) { cache = null; }
+  if (cache) { const hit = await cache.match(url); if (hit) return hit; }
+  const resp = await fetch(url, { mode: 'cors' });
+  if (!resp.ok) throw new Error('Download failed: ' + url.split('/').pop() + ' (' + resp.status + ')');
+  // stream with progress
+  let blob;
+  const total = +resp.headers.get('content-length') || 0;
+  if (resp.body && onProgress && total) {
+    const reader = resp.body.getReader(); const chunks = []; let got = 0;
+    while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); got += value.length; onProgress(got / total); }
+    blob = new Blob(chunks, { type: resp.headers.get('content-type') || 'application/octet-stream' });
+  } else blob = await resp.blob();
+  const stored = new Response(blob, { headers: { 'content-type': blob.type, 'content-length': String(blob.size) } });
+  if (cache) { try { await cache.put(url, stored.clone()); } catch (e) { } }
+  return stored;
+}
+async function isCached(url) { try { const c = await caches.open(CACHE_NAME); return !!(await c.match(url)); } catch (e) { return false; } }
+async function clearAssetCache() { try { await caches.delete(CACHE_NAME); } catch (e) { } }
+
+/* ---------- MediaPipe Pose Landmarker ---------- */
+const MP_VER = '0.10.35';
+const MP_BASE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VER}`;
+const MODEL_URLS = {
+  heavy: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task',
+  full: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',
+  lite: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task'
+};
+const Pose = {
+  landmarker: null, variant: null, delegate: null, loading: null, mod: null, lastTs: -1,
+  async simd() { try { return WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11])); } catch (e) { return false; } },
+  async ensure(variant = S.model, onStatus = () => { }) {
+    if (this.landmarker && this.variant === variant) return this.landmarker;
+    if (this.loading) return this.loading;
+    this.loading = (async () => {
+      try {
+        if (this.landmarker) { try { this.landmarker.close(); } catch (e) { } this.landmarker = null; }
+        onStatus('Loading pose engine…', 0);
+        const simd = await this.simd();
+        const loaderUrl = `${MP_BASE}/wasm/vision_wasm${simd ? '' : '_nosimd'}_internal.js`;
+        const wasmUrl = `${MP_BASE}/wasm/vision_wasm${simd ? '' : '_nosimd'}_internal.wasm`;
+        const bundleUrl = `${MP_BASE}/vision_bundle.mjs`;
+        const [bundleResp, loaderResp, wasmResp] = await Promise.all([cachedFetch(bundleUrl), cachedFetch(loaderUrl), cachedFetch(wasmUrl)]);
+        if (!this.mod) {
+          try {
+            const js = await bundleResp.text();
+            const bUrl = URL.createObjectURL(new Blob([js], { type: 'text/javascript' }));
+            this.mod = await import(bUrl);
+          } catch (e) { this.mod = await import(bundleUrl); }
+        }
+        const loaderBlobUrl = URL.createObjectURL(new Blob([await loaderResp.text()], { type: 'text/javascript' }));
+        const wasmBlobUrl = URL.createObjectURL(await wasmResp.blob());
+        onStatus(`Downloading ${variant} model…`, 0.05);
+        const modelResp = await cachedFetch(MODEL_URLS[variant], p => onStatus(`Downloading ${variant} model… ${Math.round(p * 100)}%`, 0.05 + p * 0.8));
+        const modelBuf = new Uint8Array(await modelResp.arrayBuffer());
+        onStatus('Starting pose engine…', 0.9);
+        const files = { wasmLoaderPath: loaderBlobUrl, wasmBinaryPath: wasmBlobUrl };
+        const mk = async delegate => this.mod.PoseLandmarker.createFromOptions(files, {
+          baseOptions: { modelAssetBuffer: modelBuf, delegate },
+          runningMode: 'VIDEO', numPoses: 1, minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5, minTrackingConfidence: 0.5, outputSegmentationMasks: false
+        });
+        try { this.landmarker = await mk('GPU'); this.delegate = 'GPU'; }
+        catch (e) { console.warn('GPU delegate failed, using CPU', e); this.landmarker = await mk('CPU'); this.delegate = 'CPU'; }
+        this.variant = variant; this.lastTs = -1;
+        onStatus('Ready', 1);
+        return this.landmarker;
+      } finally { this.loading = null; }
+    })();
+    return this.loading;
+  },
+  detect(source, tsMs) {
+    // timestamps must be strictly increasing for VIDEO mode
+    if (tsMs <= this.lastTs) tsMs = this.lastTs + 1;
+    this.lastTs = tsMs;
+    return this.landmarker.detectForVideo(source, tsMs);
+  },
+  reset() { this.lastTs = -1; }
+};
+
+/* ---------- Video frame extraction (seek-stepping: deterministic, no dropped frames) ---------- */
+function loadVideoMeta(video, src) {
+  return new Promise((res, rej) => {
+    const done = () => { cleanup(); res(); };
+    const fail = () => { cleanup(); rej(new Error('Could not open this video. Try a different clip or format (MP4/MOV).')); };
+    const cleanup = () => { video.removeEventListener('loadedmetadata', done); video.removeEventListener('error', fail); };
+    video.addEventListener('loadedmetadata', done); video.addEventListener('error', fail);
+    video.src = src; video.load();
+  });
+}
+function seekTo(video, t) {
+  return new Promise(res => {
+    if (Math.abs(video.currentTime - t) < 0.0005 && video.readyState >= 2) { res(); return; }
+    let done = false; const fin = () => { if (done) return; done = true; video.removeEventListener('seeked', fin); clearTimeout(to); res(); };
+    const to = setTimeout(fin, 1500);
+    video.addEventListener('seeked', fin); video.currentTime = t;
+  });
+}
+/** Extract pose landmarks for every sampled frame. Returns {frames:[{t, lm:[[x,y,z,v]...]|null, wl}], w, h, fps} */
+async function extractPoses(video, opts, onProgress, isCancelled) {
+  const fps = opts.fps || 30, step = 1 / fps;
+  const dur = video.duration;
+  if (!isFinite(dur) || dur <= 0) throw new Error('This video has no readable duration.');
+  if (dur > 20) throw new Error('Clip is ' + Math.round(dur) + 's long. Please trim it to under 20 seconds (one swing).');
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw || !vh) throw new Error('Could not read the video size.');
+  const scale = Math.min(1, opts.maxRes / Math.max(vw, vh));
+  const cw = Math.round(vw * scale), ch = Math.round(vh * scale);
+  const canvas = $('#workCanvas'); canvas.width = cw; canvas.height = ch;
+  const ctx = canvas.getContext('2d', { willReadFrequently: false });
+  const frames = []; const n = Math.floor(dur * fps);
+  Pose.reset();
+  const t0 = performance.now();
+  // make sure first frame decodes before we start
+  try { await video.play(); } catch (e) { } video.pause();
+  for (let i = 0; i < n; i++) {
+    if (isCancelled()) throw new Error('cancelled');
+    const t = i * step + 0.001;
+    await seekTo(video, t);
+    ctx.drawImage(video, 0, 0, cw, ch);
+    let lm = null, wl = null;
+    try {
+      const r = Pose.detect(canvas, Math.round(t * 1000));
+      if (r && r.landmarks && r.landmarks[0]) {
+        lm = r.landmarks[0].map(p => [p.x, p.y, p.z, p.visibility ?? 0]);
+        wl = r.worldLandmarks && r.worldLandmarks[0] ? r.worldLandmarks[0].map(p => [p.x, p.y, p.z]) : null;
+      }
+    } catch (e) { console.warn('detect error frame', i, e); }
+    frames.push({ t, lm, wl });
+    if (i % 2 === 0) { const el = (performance.now() - t0) / 1000; onProgress((i + 1) / n, (i + 1) / el); await sleep(0); }
+  }
+  return { frames, w: vw, h: vh, fps, duration: dur };
+}
+
+/* ---------- Cleaning: visibility gating, gap interpolation, smoothing ---------- */
+const KEY_IDS = [11, 12, 23, 24, 25, 26, 27, 28, 15, 16, 13, 14, 0];
+function frameQuality(lm) { if (!lm) return 0; let s = 0; for (const i of KEY_IDS) s += lm[i][3]; return s / KEY_IDS.length; }
+function cleanFrames(frames) {
+  const q = frames.map(f => frameQuality(f.lm));
+  const valid = q.map(v => v >= 0.5);
+  const validCount = valid.filter(Boolean).length;
+  // interpolate gaps (up to 8 frames) between valid frames; drop leading/trailing invalid by copying nearest
+  const out = frames.map(f => ({ t: f.t, lm: f.lm ? f.lm.map(p => p.slice()) : null, wl: f.wl ? f.wl.map(p => p.slice()) : null }));
+  let firstV = valid.indexOf(true), lastV = valid.lastIndexOf(true);
+  if (firstV < 0) return { frames: out, valid, validFrac: 0, quality: 0 };
+  for (let i = 0; i < firstV; i++) { out[i].lm = out[firstV].lm.map(p => p.slice()); out[i].wl = out[firstV].wl ? out[firstV].wl.map(p => p.slice()) : null; }
+  for (let i = lastV + 1; i < out.length; i++) { out[i].lm = out[lastV].lm.map(p => p.slice()); out[i].wl = out[lastV].wl ? out[lastV].wl.map(p => p.slice()) : null; }
+  let i = firstV;
+  while (i < lastV) {
+    if (valid[i]) { i++; continue; }
+    let j = i; while (j <= lastV && !valid[j]) j++;
+    const a = out[i - 1], b = out[j]; const gap = j - i + 1;
+    for (let k = i; k < j; k++) {
+      const u = (k - i + 1) / gap;
+      out[k].lm = a.lm.map((p, idx) => [p[0] + (b.lm[idx][0] - p[0]) * u, p[1] + (b.lm[idx][1] - p[1]) * u, p[2] + (b.lm[idx][2] - p[2]) * u, Math.min(p[3], b.lm[idx][3])]);
+      out[k].wl = (a.wl && b.wl) ? a.wl.map((p, idx) => [p[0] + (b.wl[idx][0] - p[0]) * u, p[1] + (b.wl[idx][1] - p[1]) * u, p[2] + (b.wl[idx][2] - p[2]) * u]) : (a.wl || b.wl);
+    }
+    i = j;
+  }
+  // centred weighted moving average (offline, no lag): weights 1,2,3,2,1
+  const W = [1, 2, 3, 2, 1], off = 2, wsum = 9;
+  const sm = out.map((f, idx) => {
+    const lm = f.lm.map((p, pi) => {
+      let x = 0, y = 0, z = 0;
+      for (let k = 0; k < W.length; k++) { const j = clamp(idx + k - off, 0, out.length - 1); const q2 = out[j].lm[pi]; x += q2[0] * W[k]; y += q2[1] * W[k]; z += q2[2] * W[k]; }
+      return [x / wsum, y / wsum, z / wsum, p[3]];
+    });
+    let wl = null;
+    if (f.wl) wl = f.wl.map((p, pi) => {
+      let x = 0, y = 0, z = 0, c = 0;
+      for (let k = 0; k < W.length; k++) { const j = clamp(idx + k - off, 0, out.length - 1); const q2 = out[j].wl && out[j].wl[pi]; if (!q2) continue; x += q2[0] * W[k]; y += q2[1] * W[k]; z += q2[2] * W[k]; c += W[k]; }
+      return c ? [x / c, y / c, z / c] : p;
+    });
+    return { t: f.t, lm, wl };
+  });
+  const qv = q.filter((v, idx) => valid[idx]);
+  return { frames: sm, valid, validFrac: validCount / frames.length, quality: qv.length ? qv.reduce((a, b) => a + b, 0) / qv.length : 0 };
+}
+/** Check footage is usable. Returns null if OK, else {title, tips[]} */
+function footageProblems(cleaned, w, h) {
+  const tips = [];
+  if (cleaned.validFrac < 0.6) tips.push('The pose was only found clearly in ' + Math.round(cleaned.validFrac * 100) + '% of frames.');
+  if (cleaned.quality && cleaned.quality < 0.6) tips.push('Joint confidence was low (' + Math.round(cleaned.quality * 100) + '%).');
+  if (cleaned.validFrac > 0) {
+    const hs = cleaned.frames.filter((f, i) => cleaned.valid[i]).map(f => Math.abs(((f.lm[27][1] + f.lm[28][1]) / 2) - ((f.lm[11][1] + f.lm[12][1]) / 2)));
+    hs.sort((a, b) => a - b); const med = hs[Math.floor(hs.length / 2)] || 0;
+    if (med < 0.28) tips.push('You look small in frame (body height ' + Math.round(med * 100) + '% of the image). Move the camera closer.');
+    const offEdge = cleaned.frames.filter((f, i) => cleaned.valid[i] && (f.lm[27][1] > 0.99 || f.lm[28][1] > 0.99 || f.lm[0][1] < 0.01)).length / Math.max(1, cleaned.frames.length);
+    if (offEdge > 0.2) tips.push('Feet or head are cut off in ' + Math.round(offEdge * 100) + '% of frames. Keep the whole body in shot.');
+  }
+  if (!tips.length) return null;
+  return { title: 'Footage not clear enough to analyse', tips: tips.concat(['Fix: stand 3–4 m from the phone, whole body in frame, good even light, plain background, phone steady.']) };
+}
+
+/* =====================================================================
+   SwingCheck — analysis engine: geometry, metrics, phases, bands, faults
+   ===================================================================== */
+
+const PHASES = ['address', 'takeaway', 'backswing', 'top', 'downswing', 'impact', 'followthrough'];
+const PHASE_LABEL = { address: 'Address', takeaway: 'Takeaway', backswing: 'Backswing', top: 'Top', downswing: 'Downswing', impact: 'Impact', followthrough: 'Follow-through' };
+const PHASE_SHORT = { address: 'Addr', takeaway: 'Take', backswing: 'Back', top: 'Top', downswing: 'Down', impact: 'Imp', followthrough: 'Fin' };
+const VIEW_LABEL = { face: 'Face-on', dtl: 'Down-the-line' };
+const BAND_K = 8; // samples per phase for calibration bands
+
+/* ---------- Metric definitions ----------
+   def: default coaching ranges per phase [min,max] (null = not checked). Units: ° or % (of stance width / torso length).
+   These are broad beginner-friendly guidance ranges drawn from common golf biomechanics norms — not gospel. Calibrated ranges replace them. */
+const METRICS = {
+  leadKneeFlex: { label: 'Lead knee flex', unit: '°', views: ['face', 'dtl'], segs: ['leadThigh', 'leadShin'], minTol: 4,
+    def: { address: [15, 35], takeaway: [15, 35], backswing: [10, 40], top: [10, 40], downswing: [10, 40], impact: [5, 35], followthrough: [0, 30] },
+    high: 'lead knee more bent than usual', low: 'lead knee straighter than usual',
+    why: 'The lead knee should stay softly flexed until it straightens through impact. Straightening too early lifts you out of posture; over-bending drops you.',
+    fix: 'Keep a soft, "athletic" lead knee — think "knees over laces" at address and keep the flex until the ball is gone.' },
+  trailKneeFlex: { label: 'Trail knee flex', unit: '°', views: ['face', 'dtl'], segs: ['trailThigh', 'trailShin'], minTol: 4,
+    def: { address: [15, 35], takeaway: [15, 35], backswing: [10, 35], top: [10, 35], downswing: [10, 40], impact: [15, 50], followthrough: [5, 45] },
+    high: 'trail knee more bent than usual', low: 'trail knee straighter than usual',
+    why: 'Keeping trail-knee flex in the backswing stops the hips sliding and stores power. A locked trail knee usually means a sway or reverse pivot.',
+    fix: 'Feel the trail knee stay bent and pointing at the ball during the backswing, like you are sitting into the trail hip.' },
+  spineTiltSide: { label: 'Spine tilt (side)', unit: '°', views: ['face'], segs: ['torsoL', 'torsoR'], minTol: 4,
+    def: { address: [2, 15], takeaway: [2, 15], backswing: [2, 18], top: [2, 18], downswing: [4, 24], impact: [8, 28], followthrough: [5, 40] },
+    high: 'upper body tilted further away from the target than usual', low: 'upper body more upright / toward the target than usual',
+    why: 'Face-on, the spine should tilt slightly away from the target at address and a bit more at impact. Tilting toward the target at impact is a reverse-pivot look.',
+    fix: 'At address, bump the hips slightly toward the target so the lead shoulder sits higher; keep your head behind the ball through impact.' },
+  spineTiltFwd: { label: 'Spine tilt (forward)', unit: '°', views: ['dtl'], segs: ['torsoL', 'torsoR'], minTol: 4,
+    def: { address: [25, 45], takeaway: [25, 45], backswing: [25, 45], top: [25, 45], downswing: [22, 45], impact: [20, 45], followthrough: [5, 40] },
+    high: 'bent over more than usual', low: 'more upright than usual (standing up)',
+    why: 'Down-the-line, the forward bend from the hips should stay roughly constant until after impact. Losing it is "early extension" / loss of posture.',
+    fix: 'Keep your chest pointing at the ball and your backside back through the downswing — hit a wall with your bum behind you.' },
+  shoulderTurn: { label: 'Shoulder turn', unit: '°', views: ['face', 'dtl'], segs: ['shoulders'], minTol: 8, estimate: true,
+    def: { address: [-10, 10], takeaway: [0, 50], backswing: [25, 105], top: [65, 115], downswing: [10, 105], impact: [-45, 15], followthrough: [-130, -15] },
+    high: 'more shoulder turn than usual', low: 'less shoulder turn than usual',
+    why: 'A full shoulder turn (around 80–100°) at the top creates width and power; a short turn usually means an arms-only swing.',
+    fix: 'Turn your lead shoulder under your chin going back. Let the hips turn too — do not fight them.' },
+  hipTurn: { label: 'Hip turn', unit: '°', views: ['face', 'dtl'], segs: ['pelvis'], minTol: 8, estimate: true,
+    def: { address: [-8, 10], takeaway: [-5, 30], backswing: [5, 60], top: [25, 65], downswing: [-15, 55], impact: [-65, -5], followthrough: [-120, -30] },
+    high: 'more hip turn than usual', low: 'less hip turn than usual',
+    why: 'Hips turn about half as much as the shoulders going back, then clear (open) through impact. Hips that do not open at impact block the arms.',
+    fix: 'Start the downswing by turning the belt buckle toward the target.' },
+  xFactor: { label: 'X-factor (shoulders − hips)', unit: '°', views: ['face', 'dtl'], segs: ['shoulders', 'pelvis'], minTol: 8, estimate: true,
+    def: { address: null, takeaway: null, backswing: null, top: [25, 65], downswing: [10, 65], impact: null, followthrough: null },
+    high: 'more shoulder–hip separation than usual', low: 'less separation than usual',
+    why: 'The difference between shoulder and hip turn at the top is stored power. Too little means everything turned together; too much can strain the back.',
+    fix: 'Keep the trail knee flexed to limit hip turn while the shoulders keep turning.' },
+  leadArm: { label: 'Lead arm straightness', unit: '°', views: ['face', 'dtl'], segs: ['leadUpperArm', 'leadForearm'], minTol: 5,
+    def: { address: [150, 180], takeaway: [155, 180], backswing: [150, 180], top: [140, 180], downswing: [150, 180], impact: [155, 180], followthrough: [125, 180] },
+    high: 'lead arm straighter than usual', low: 'lead arm more bent than usual',
+    why: 'A fairly straight lead arm (180° = dead straight) keeps the swing wide and consistent. A bent lead arm just after impact is a "chicken wing".',
+    fix: 'Feel the lead arm stretch away from your chest in the backswing and both arms extend toward the target after impact.' },
+  trailElbow: { label: 'Trail elbow fold', unit: '°', views: ['face', 'dtl'], segs: ['trailUpperArm', 'trailForearm'], minTol: 6,
+    def: { address: [140, 180], takeaway: [135, 180], backswing: [75, 165], top: [65, 125], downswing: [75, 165], impact: [115, 178], followthrough: [135, 180] },
+    high: 'trail elbow straighter than usual', low: 'trail elbow more folded than usual',
+    why: 'The trail elbow folds to about 90° at the top and stays folded into the downswing before releasing. Straightening it early is "casting".',
+    fix: 'Keep the trail elbow close to your side starting down — like skipping a stone.' },
+  headSway: { label: 'Head sway', unit: '%', views: ['face'], segs: ['head'], minTol: 5,
+    def: { address: [-5, 5], takeaway: [-10, 10], backswing: [-20, 15], top: [-25, 15], downswing: [-25, 15], impact: [-25, 12], followthrough: [-30, 35] },
+    high: 'head moved further away from the target than usual', low: 'head moved further toward the target than usual',
+    why: 'Measured as % of your stance width. A little movement is fine; a big slide away from the target in the backswing is a sway, toward the target is a slide.',
+    fix: 'Keep your head roughly centred and turn around your spine rather than sliding side to side.' },
+  headLift: { label: 'Head lift', unit: '%', views: ['dtl'], segs: ['head'], minTol: 4,
+    def: { address: [-5, 5], takeaway: [-8, 8], backswing: [-12, 10], top: [-12, 10], downswing: [-15, 10], impact: [-15, 10], followthrough: [-15, 35] },
+    high: 'head lifted more than usual', low: 'head dropped more than usual',
+    why: 'Measured as % of torso length (up is positive). Lifting the head before impact means the whole body stood up — loss of posture.',
+    fix: 'Keep your chest down over the ball until it is gone; let your head come up with your finish, not before.' },
+  hipSway: { label: 'Hip sway', unit: '%', views: ['face'], segs: ['pelvis'], minTol: 5,
+    def: { address: [-5, 5], takeaway: [-10, 10], backswing: [-18, 10], top: [-18, 10], downswing: [-22, 15], impact: [-32, 8], followthrough: [-45, 5] },
+    high: 'hips slid further away from the target than usual', low: 'hips moved further toward the target than usual',
+    why: 'Measured as % of stance width, positive = away from the target. Hips sliding away from the target in the backswing is a sway; sliding toward it early is a slide.',
+    fix: 'Feel the trail hip turn back and up, not sideways. Keep the pressure on the inside of the trail foot.' },
+  weightShift: { label: 'Weight shift', unit: '%', views: ['face'], segs: ['pelvis', 'leadShin', 'trailShin'], minTol: 6,
+    def: { address: [-15, 15], takeaway: [-20, 15], backswing: [-25, 10], top: [-25, 10], downswing: [-12, 30], impact: [5, 45], followthrough: [15, 65] },
+    high: 'weight further toward the target than usual', low: 'weight further away from the target than usual',
+    why: 'Hip centre relative to your feet, positive = toward the target. Weight should be slightly back at the top and clearly forward at impact. Forward at the top = reverse pivot.',
+    fix: 'Load into the trail side going back, then push off it so your belt buckle moves toward the target starting down.' },
+  hipThrust: { label: 'Hips toward ball', unit: '%', views: ['dtl'], segs: ['pelvis'], minTol: 4,
+    def: { address: [-5, 5], takeaway: [-8, 8], backswing: [-15, 8], top: [-15, 8], downswing: [-15, 10], impact: [-15, 12], followthrough: [-20, 25] },
+    high: 'hips moved further toward the ball than usual', low: 'hips moved further away from the ball than usual',
+    why: 'Measured as % of torso length, positive = toward the ball. Hips thrusting toward the ball in the downswing is early extension — the classic cause of blocks and hooks.',
+    fix: 'Keep your backside against an imaginary wall behind you through impact.' },
+  handsOut: { label: 'Hands toward ball', unit: '%', views: ['dtl'], segs: ['leadForearm', 'trailForearm'], minTol: 6,
+    def: { address: [-8, 8], takeaway: [-15, 30], backswing: [-30, 35], top: [-40, 30], downswing: [-35, 35], impact: [-15, 40], followthrough: [-25, 60] },
+    high: 'hands further out toward the ball than usual', low: 'hands further in than usual',
+    why: 'Hands position relative to address, positive = toward the ball line. Hands coming down further out than they went back is an "over the top" path.',
+    fix: 'Feel the hands drop and the trail elbow tuck starting down, then swing out to right field (for a right-hander).' },
+  handsHeight: { label: 'Hands height', unit: '%', views: ['face', 'dtl'], segs: [], minTol: 8,
+    def: { address: null, takeaway: null, backswing: null, top: null, downswing: null, impact: null, followthrough: null },
+    high: 'hands higher than usual', low: 'hands lower than usual',
+    why: 'Hands height above the hips as % of torso length. No default range — it is only compared against your own reference swings.',
+    fix: 'Compare with your reference swings to see if your arm swing is longer or shorter than normal.' },
+  stanceWidth: { label: 'Stance width', unit: '%', views: ['face'], segs: ['leadShin', 'trailShin'], minTol: 8,
+    def: { address: [85, 165], takeaway: null, backswing: null, top: null, downswing: null, impact: null, followthrough: null },
+    high: 'stance wider than usual', low: 'stance narrower than usual',
+    why: 'Distance between the ankles as % of shoulder width. Too narrow makes balance hard; too wide restricts the hip turn.',
+    fix: 'For mid irons, feet about shoulder-width apart (measured inside the heels); a touch wider for driver.' }
+};
+const METRIC_IDS = Object.keys(METRICS);
+const metricsForView = v => METRIC_IDS.filter(m => METRICS[m].views.includes(v));
+
+/* ---------- Fault dictionary (named faults) ---------- */
+const FAULTS = {
+  earlyExtension: { name: 'Early extension', views: ['dtl'], metrics: ['hipThrust', 'spineTiltFwd'],
+    meaning: 'Your hips moved toward the ball and your body stood up in the downswing instead of keeping the tilt you had at address. It crowds the arms, causing blocks, hooks and thin shots.',
+    fix: 'Set up with your backside against a chair or wall and keep it touching through impact. Feel your chest stay down over the ball.' },
+  lossOfPosture: { name: 'Loss of posture', views: ['dtl'], metrics: ['spineTiltFwd', 'headLift'],
+    meaning: 'You stood up out of your address posture before the ball was struck, so the club arrives at a different height than you set up for.',
+    fix: 'Keep the same forward bend from address to impact. Rehearse slow swings with your head lightly touching a wall in front of you.' },
+  sway: { name: 'Sway', views: ['face'], metrics: ['hipSway', 'headSway'],
+    meaning: 'Your hips (and often head) slid sideways away from the target in the backswing rather than turning. It makes it hard to get back to the ball consistently.',
+    fix: 'Put an alignment stick or bag just outside your trail hip and turn without touching it. Keep the trail knee flexed.' },
+  reversePivot: { name: 'Reverse pivot', views: ['face'], metrics: ['weightShift', 'spineTiltSide'],
+    meaning: 'Your weight moved toward the target at the top of the backswing (and then falls back in the downswing) — the opposite of a good weight shift. It costs power and causes fat and thin shots.',
+    fix: 'Feel your weight load into the trail heel at the top with your head behind the ball, then move toward the target starting down.' },
+  chickenWing: { name: 'Chicken wing', views: ['face', 'dtl'], metrics: ['leadArm'],
+    meaning: 'Your lead elbow bent and pulled up/out just after impact instead of the arms extending toward the target. Usually a sign of the body stalling or steering the shot.',
+    fix: 'Rehearse slow swings to hip height past impact with both arms straight and the club pointing at the target. Keep the body turning.' },
+  casting: { name: 'Casting', views: ['face', 'dtl'], metrics: ['trailElbow'],
+    meaning: 'The trail elbow straightened early in the downswing (proxy for the wrists releasing too soon), throwing the clubhead from the top. It loses speed and causes fat or weak shots.',
+    fix: 'Start down with the lower body and keep the trail elbow close to your side — like skipping a stone or hammering a nail with the wrist angle held.' },
+  overTheTop: { name: 'Over the top', views: ['dtl'], metrics: ['handsOut'],
+    meaning: 'On the way down your hands travelled further out toward the ball than on the way back, so the club approaches from outside the target line — the usual cause of slices and pulls.',
+    fix: 'Feel the hands drop and the trail elbow tuck at the start of the downswing, then swing out toward right field (right-handers).' }
+};
+
+/* ---------- Geometry helpers ---------- */
+const LM = { nose: 0, lEar: 7, rEar: 8, lSh: 11, rSh: 12, lEl: 13, rEl: 14, lWr: 15, rWr: 16, lHip: 23, rHip: 24, lKn: 25, rKn: 26, lAn: 27, rAn: 28 };
+function sidesFor(hand) {
+  const L = { sh: 11, el: 13, wr: 15, hip: 23, kn: 25, an: 27 }, R = { sh: 12, el: 14, wr: 16, hip: 24, kn: 26, an: 28 };
+  return hand === 'R' ? { lead: L, trail: R } : { lead: R, trail: L };
+}
+function angleAt(a, b, c) { const v1x = a.x - b.x, v1y = a.y - b.y, v2x = c.x - b.x, v2y = c.y - b.y; const d = (v1x * v2x + v1y * v2y) / (Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y) || 1e-9); return deg(Math.acos(clamp(d, -1, 1))); }
+const wrap180 = a => { a = ((a + 180) % 360 + 360) % 360 - 180; return a; };
+
+/** Aspect-corrected 2D point (y in image-height units) */
+function frameGeom(f, aspect, hand) {
+  const P = i => ({ x: f.lm[i][0] * aspect, y: f.lm[i][1] });
+  const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  const sd = sidesFor(hand);
+  const lSh = P(11), rSh = P(12), lHip = P(23), rHip = P(24), lAn = P(27), rAn = P(28), lWr = P(15), rWr = P(16), nose = P(0);
+  const shMid = mid(lSh, rSh), hipMid = mid(lHip, rHip), anMid = mid(lAn, rAn), wrMid = mid(lWr, rWr);
+  const torso = Math.hypot(shMid.x - hipMid.x, shMid.y - hipMid.y);
+  const g = {
+    shMid, hipMid, anMid, wrMid, nose, torso,
+    shoulderW: Math.hypot(lSh.x - rSh.x, lSh.y - rSh.y), stanceW: Math.hypot(lAn.x - rAn.x, lAn.y - rAn.y),
+    leadKnee: angleAt(P(sd.lead.hip), P(sd.lead.kn), P(sd.lead.an)), trailKnee: angleAt(P(sd.trail.hip), P(sd.trail.kn), P(sd.trail.an)),
+    leadArm: angleAt(P(sd.lead.sh), P(sd.lead.el), P(sd.lead.wr)), trailElbow: angleAt(P(sd.trail.sh), P(sd.trail.el), P(sd.trail.wr)),
+    rShX: rSh.x, lShX: lSh.x,
+    shRot: NaN, hipRot: NaN
+  };
+  if (f.wl) { // horizontal-plane rotation of shoulder / hip lines from pseudo-3D world landmarks
+    const w = f.wl; g.shRot = deg(Math.atan2(w[12][2] - w[11][2], w[12][0] - w[11][0])); g.hipRot = deg(Math.atan2(w[24][2] - w[23][2], w[24][0] - w[23][0]));
+  }
+  return g;
+}
+const median = arr => { const a = arr.filter(v => isFinite(v)).slice().sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : NaN; };
+function smooth1d(a, w = 2) { return a.map((v, i) => { let s = 0, c = 0; for (let k = -w; k <= w; k++) { const j = i + k; if (j >= 0 && j < a.length && isFinite(a[j])) { s += a[j]; c++; } } return c ? s / c : v; }); }
+
+/* ---------- Phase detection ---------- */
+/** hands = {x[],y[]} aspect-corrected; torso = median torso length; fps. det = thresholds. Returns key indices. */
+function detectPhases(hands, torso, fps, det) {
+  const n = hands.x.length; if (n < 8) return null;
+  const sp = new Array(n).fill(0);
+  for (let i = 1; i < n - 1; i++) sp[i] = Math.hypot(hands.x[i + 1] - hands.x[i - 1], hands.y[i + 1] - hands.y[i - 1]) / (2 / fps) / torso;
+  sp[0] = sp[1]; sp[n - 1] = sp[n - 2];
+  const speed = smooth1d(sp, 1);
+  const vy = new Array(n).fill(0); for (let i = 1; i < n - 1; i++) vy[i] = (hands.y[i + 1] - hands.y[i - 1]) / (2 / fps) / torso; // + = downward
+  const peak = Math.max(...speed); if (!(peak > 0.3)) return null; // no real motion
+  const thr = det.moveStart * peak;
+  // fastest downward hand motion = downswing
+  let fd = 0; for (let i = 0; i < n; i++) if (vy[i] > vy[fd]) fd = i;
+  // top = highest hands (min y) before the fastest downward frame
+  let top = 0; for (let i = 0; i <= fd; i++) if (hands.y[i] < hands.y[top]) top = i;
+  // takeaway start: walk back from top to last slow frame
+  let t0 = top; while (t0 > 0 && speed[t0 - 1] > thr) t0--;
+  if (t0 === top) { t0 = Math.max(0, top - Math.round(fps * 0.6)); }
+  const addrY = median(hands.y.slice(0, Math.max(1, t0)));
+  const topY = hands.y[top];
+  // impact: hands return to (impactFrac of the way back to) address height after the top
+  let impact = -1; const target = topY + det.impactFrac * (addrY - topY);
+  for (let i = Math.max(top + 1, fd - 1); i < n; i++) { if (hands.y[i] >= target) { impact = i; break; } }
+  if (impact < 0) { impact = fd; for (let i = fd; i < n; i++) if (speed[i] > speed[impact]) impact = i; }
+  if (impact <= top + 1) impact = Math.min(n - 1, top + 2);
+  // finish: last fast frame after impact
+  let fin = n - 1; while (fin > impact + 1 && speed[fin] < thr) fin--;
+  return { t0, top, impact, fin, fd, speed, vy, addrY, topY, peak };
+}
+/** Convert key indices into phase ranges (inclusive [s,e]) */
+function phaseRanges(k, n, fps) {
+  const tw = Math.max(1, Math.round(fps * 0.06)), iw = Math.max(1, Math.round(fps * 0.04));
+  const t0 = clamp(k.t0, 1, n - 6), top = clamp(k.top, t0 + 2, n - 4), impact = clamp(k.impact, top + 2, n - 2);
+  // takeaway → backswing when hands rise above hip height (k.hipCross) else 35% of backswing
+  let t1 = k.t1 != null ? k.t1 : Math.round(t0 + (top - t0) * 0.35);
+  t1 = clamp(t1, t0 + 1, top - tw - 1 > t0 + 1 ? top - tw - 1 : t0 + 1);
+  const r = {
+    address: [0, t0 - 1], takeaway: [t0, t1 - 1], backswing: [t1, Math.max(t1, top - tw - 1)], top: [Math.max(t1, top - tw), Math.min(top + tw, impact - iw - 1)],
+    downswing: [Math.min(top + tw + 1, impact - iw), impact - iw - 1], impact: [impact - iw, Math.min(n - 1, impact + iw)], followthrough: [Math.min(n - 1, impact + iw + 1), n - 1]
+  };
+  for (const p of PHASES) { if (r[p][1] < r[p][0]) r[p][1] = r[p][0]; r[p][0] = clamp(r[p][0], 0, n - 1); r[p][1] = clamp(r[p][1], 0, n - 1); }
+  return r;
+}
+function phaseOfFrame(ranges, i) { for (const p of PHASES) { const [s, e] = ranges[p]; if (i >= s && i <= e) return { phase: p, u: e > s ? (i - s) / (e - s) : 0.5 }; } return { phase: 'followthrough', u: 1 }; }
+
+/* ---------- Full metric computation ---------- */
+/**
+ * frames: cleaned frames; returns {metrics:{id:[]}, ranges, keys, view, hand, autoHand, autoView, dirs}
+ */
+function computeSwing(frames, w, h, fps, opts) {
+  const aspect = w / h; const n = frames.length;
+  let hand = opts.hand;
+  const G0 = frames.map(f => frameGeom(f, aspect, hand));
+  const torso = median(G0.map(g => g.torso));
+  const hands = { x: G0.map(g => g.wrMid.x), y: G0.map(g => g.wrMid.y) };
+  const keys = detectPhases(hands, torso, fps, opts.det || S.det);
+  if (!keys) return { error: 'No swing detected in this clip. Make sure the whole swing (address to finish) is in the video and your hands are visible.' };
+  // address reference geometry (medians over address frames)
+  const addrEnd = Math.max(1, keys.t0);
+  const A = {};
+  const medOf = fn => median(G0.slice(0, addrEnd).map(fn));
+  A.shMid = { x: medOf(g => g.shMid.x), y: medOf(g => g.shMid.y) }; A.hipMid = { x: medOf(g => g.hipMid.x), y: medOf(g => g.hipMid.y) };
+  A.anMid = { x: medOf(g => g.anMid.x), y: medOf(g => g.anMid.y) }; A.wrMid = { x: medOf(g => g.wrMid.x), y: medOf(g => g.wrMid.y) }; A.nose = { x: medOf(g => g.nose.x), y: medOf(g => g.nose.y) };
+  A.torso = medOf(g => g.torso); A.shoulderW = medOf(g => g.shoulderW); A.stanceW = Math.max(medOf(g => g.stanceW), A.shoulderW * 0.4);
+  A.shRot = medOf(g => g.shRot); A.hipRot = medOf(g => g.hipRot); A.rShX = medOf(g => g.rShX); A.lShX = medOf(g => g.lShX);
+  // view auto-detect: shoulder width vs torso length at address
+  const autoView = (A.shoulderW / A.torso) > 0.45 ? 'face' : 'dtl';
+  const view = opts.view || autoView;
+  // direction conventions
+  let trailDir = Math.sign(hands.x[keys.top] - hands.x[keys.t0]) || 1; // face-on: hands move toward trail side going back
+  let autoHand = null;
+  if (view === 'face' && Math.abs(hands.x[keys.top] - hands.x[keys.t0]) > 0.15 * A.torso) {
+    // which shoulder sits on the trail side at address?
+    autoHand = Math.sign(A.rShX - A.lShX) === trailDir ? 'R' : 'L';
+  } else if (view === 'face') { trailDir = Math.sign((hand === 'R' ? A.rShX : A.lShX) - (hand === 'R' ? A.lShX : A.rShX)) || 1; }
+  const targetDir = -trailDir;
+  const ballDir = Math.sign(A.wrMid.x - A.anMid.x) || 1; // DTL: hands hang out toward the ball
+  // if handedness changed by auto-detect and caller allows, recompute lead/trail geometry
+  if (autoHand && opts.applyAutoHand && autoHand !== hand) { hand = autoHand; for (let i = 0; i < n; i++) G0[i] = frameGeom(frames[i], aspect, hand); }
+  // turn sign so that backswing turn is positive
+  const shTurnRaw = G0.map(g => wrap180(g.shRot - A.shRot)), hipTurnRaw = G0.map(g => wrap180(g.hipRot - A.hipRot));
+  const turnSign = Math.sign(shTurnRaw[keys.top]) || 1;
+  // takeaway→backswing: hands above hip height
+  let t1 = null; for (let i = keys.t0; i <= keys.top; i++) { if (G0[i].wrMid.y < G0[i].hipMid.y - 0.05 * A.torso) { t1 = i; break; } }
+  if (t1 != null) keys.t1 = t1;
+  const ranges = phaseRanges(keys, n, fps);
+  const M = {}; for (const id of METRIC_IDS) M[id] = new Array(n).fill(NaN);
+  for (let i = 0; i < n; i++) {
+    const g = G0[i];
+    M.leadKneeFlex[i] = 180 - g.leadKnee; M.trailKneeFlex[i] = 180 - g.trailKnee;
+    M.spineTiltSide[i] = deg(Math.atan2((g.shMid.x - g.hipMid.x) * trailDir, g.hipMid.y - g.shMid.y));
+    M.spineTiltFwd[i] = deg(Math.atan2((g.shMid.x - g.hipMid.x) * ballDir, g.hipMid.y - g.shMid.y));
+    M.shoulderTurn[i] = shTurnRaw[i] * turnSign; M.hipTurn[i] = hipTurnRaw[i] * turnSign; M.xFactor[i] = M.shoulderTurn[i] - M.hipTurn[i];
+    M.leadArm[i] = g.leadArm; M.trailElbow[i] = g.trailElbow;
+    M.headSway[i] = (g.nose.x - A.nose.x) * trailDir / A.stanceW * 100;
+    M.headLift[i] = (A.nose.y - g.nose.y) / A.torso * 100;
+    M.hipSway[i] = (g.hipMid.x - A.hipMid.x) * trailDir / A.stanceW * 100;
+    M.weightShift[i] = ((g.hipMid.x - g.anMid.x) - (A.hipMid.x - A.anMid.x)) * targetDir / A.stanceW * 100;
+    M.hipThrust[i] = (g.hipMid.x - A.hipMid.x) * ballDir / A.torso * 100;
+    M.handsOut[i] = (g.wrMid.x - A.wrMid.x) * ballDir / A.torso * 100;
+    M.handsHeight[i] = (g.hipMid.y - g.wrMid.y) / A.torso * 100;
+    M.stanceWidth[i] = A.stanceW / A.shoulderW * 100;
+  }
+  for (const id of ['shoulderTurn', 'hipTurn', 'xFactor']) M[id] = smooth1d(M[id], 2);
+  return { metrics: M, ranges, fps, keys: { t0: keys.t0, t1: keys.t1 ?? null, top: keys.top, impact: keys.impact, fin: keys.fin }, hands, torso, speed: keys.speed, addrY: keys.addrY, topY: keys.topY, peak: keys.peak, view, hand, autoHand, autoView, dirs: { trailDir, targetDir, ballDir, turnSign } };
+}
+
+/* ---------- Resampling for calibration bands ---------- */
+function resamplePhase(arr, range, K = BAND_K) {
+  const [s, e] = range; const out = [];
+  for (let k = 0; k < K; k++) { const pos = s + (e - s) * (K > 1 ? k / (K - 1) : 0); const i0 = Math.floor(pos), i1 = Math.min(e, i0 + 1), u = pos - i0; const a = arr[i0], b = arr[i1]; out.push(isFinite(a) && isFinite(b) ? a + (b - a) * u : (isFinite(a) ? a : b)); }
+  return out;
+}
+function resampleSwing(metrics, ranges, view) {
+  const R = {}; for (const m of metricsForView(view)) { R[m] = {}; for (const p of PHASES) R[m][p] = resamplePhase(metrics[m], ranges[p]).map(v => isFinite(v) ? Math.round(v * 10) / 10 : null); }
+  return R;
+}
+/** Build bands {view:{metric:{phase:{n,mean[],std[]}}}} from reference records */
+function buildBands(refs) {
+  const B = {};
+  for (const r of refs) {
+    const v = r.view; B[v] = B[v] || {};
+    for (const m in r.resampled) {
+      B[v][m] = B[v][m] || {};
+      for (const p in r.resampled[m]) {
+        const vals = r.resampled[m][p]; if (!vals) continue;
+        const b = B[v][m][p] = B[v][m][p] || { n: 0, mean: new Array(BAND_K).fill(0), m2: new Array(BAND_K).fill(0), cnt: new Array(BAND_K).fill(0) };
+        let any = false;
+        for (let k = 0; k < BAND_K; k++) { const x = vals[k]; if (x == null || !isFinite(x)) continue; any = true; b.cnt[k]++; const d = x - b.mean[k]; b.mean[k] += d / b.cnt[k]; b.m2[k] += d * (x - b.mean[k]); }
+        if (any) b.n++;
+      }
+    }
+  }
+  for (const v in B) for (const m in B[v]) for (const p in B[v][m]) { const b = B[v][m][p]; b.std = b.m2.map((m2, k) => b.cnt[k] > 1 ? Math.sqrt(m2 / (b.cnt[k] - 1)) : 0); delete b.m2; }
+  return B;
+}
+
+/* ---------- Range lookup + evaluation ---------- */
+/** Returns {lo, hi, source:'calibrated'|'default'|'custom'|null, n} for metric/phase at normalised time u */
+function rangeFor(profile, view, m, p, u) {
+  const src = (profile.source && profile.source[m]) || 'auto';
+  const band = profile.bands && profile.bands[view] && profile.bands[view][m] && profile.bands[view][m][p];
+  const widen = (profile.widen && profile.widen[view] && profile.widen[view][m] && profile.widen[view][m][p]) || 1;
+  const useCal = band && band.n >= 1 && (src === 'calibrated' || (src === 'auto' && band.n >= 3));
+  if (useCal) {
+    const pos = u * (BAND_K - 1), k0 = Math.floor(pos), k1 = Math.min(BAND_K - 1, k0 + 1), t = pos - k0;
+    const mean = band.mean[k0] + (band.mean[k1] - band.mean[k0]) * t, std = band.std[k0] + (band.std[k1] - band.std[k0]) * t;
+    const tol = Math.max(2 * std, METRICS[m].minTol) * widen * (band.n < 3 ? 1.5 : 1);
+    return { lo: mean - tol, hi: mean + tol, source: 'calibrated', n: band.n, mean };
+  }
+  const custom = profile.custom && profile.custom[view] && profile.custom[view][m] && profile.custom[view][m][p];
+  const d = custom || METRICS[m].def[p];
+  if (!d) return null;
+  return { lo: d[0] * (custom ? 1 : 1) - (widen - 1) * (d[1] - d[0]) / 2, hi: d[1] + (widen - 1) * (d[1] - d[0]) / 2, source: custom ? 'custom' : 'default', n: band ? band.n : 0 };
+}
+function statusOf(v, r) {
+  if (!r || !isFinite(v)) return { status: 'na', dev: 0 };
+  if (v < r.lo) return { status: 'bad', dev: r.lo - v, dir: 'low' };
+  if (v > r.hi) return { status: 'bad', dev: v - r.hi, dir: 'high' };
+  const margin = 0.1 * (r.hi - r.lo);
+  if (v < r.lo + margin) return { status: 'warn', dev: 0, dir: 'low' };
+  if (v > r.hi - margin) return { status: 'warn', dev: 0, dir: 'high' };
+  return { status: 'good', dev: 0 };
+}
+const WORST = { na: 0, good: 1, warn: 2, bad: 3 };
+const worse = (a, b) => WORST[a] >= WORST[b] ? a : b;
+
+/**
+ * Evaluate a computed swing against a profile. Returns
+ * { frameStatus:[{metric:status}], segStatus:[{seg:status}], summary:{m:{p:{status,dev,dir,frame,value,range}}}, scores:{phase:%, overall:%}, faults:[...], counts }
+ */
+function evaluateSwing(sw, profile) {
+  const n = sw.metrics.leadKneeFlex.length; const view = sw.view; const ids = metricsForView(view);
+  const frameStatus = new Array(n), segStatus = new Array(n);
+  const summary = {}; for (const m of ids) summary[m] = {};
+  for (let i = 0; i < n; i++) {
+    const { phase, u } = phaseOfFrame(sw.ranges, i);
+    const fs = {}, ss = {};
+    for (const m of ids) {
+      const r = rangeFor(profile, view, m, phase, u); const v = sw.metrics[m][i]; const st = statusOf(v, r);
+      fs[m] = st.status;
+      const cur = summary[m][phase];
+      if (!cur || WORST[st.status] > WORST[cur.status] || (st.status === cur.status && st.dev > cur.dev)) summary[m][phase] = { status: st.status, dev: st.dev, dir: st.dir, frame: i, value: v, range: r };
+      for (const s of METRICS[m].segs) ss[s] = worse(ss[s] || 'na', st.status);
+    }
+    frameStatus[i] = fs; segStatus[i] = ss;
+  }
+  // scores
+  const scores = {}; let tot = 0, pass = 0;
+  for (const p of PHASES) {
+    let t = 0, ok = 0; for (const m of ids) { const s = summary[m][p]; if (!s || s.status === 'na') continue; t++; if (s.status !== 'bad') ok++; }
+    scores[p] = t ? Math.round(ok / t * 100) : null; tot += t; pass += ok;
+  }
+  scores.overall = tot ? Math.round(pass / tot * 100) : 0;
+  // faults
+  const faults = namedFaults(sw, profile.namedTol || {}).concat(bandFaults(sw, summary));
+  return { frameStatus, segStatus, summary, scores, faults, checks: tot, passed: pass };
+}
+function bandFaults(sw, summary) {
+  const out = [];
+  for (const m in summary) {
+    const d = METRICS[m];
+    // merge consecutive phases with the same status+direction into one fault so the list stays readable
+    let run = null;
+    const flush = () => { if (!run) return; const first = PHASE_LABEL[run.phases[0]], last = PHASE_LABEL[run.phases[run.phases.length - 1]]; const span = run.phases.length > 1 ? `${first} → ${last}` : first;
+      const msg = run.level === 'bad'
+        ? `${d.label} was up to ${fmt1(run.dev)}${d.unit} ${run.dir === 'high' ? 'above' : 'below'} your range during ${span.toLowerCase()} (${d[run.dir]}).`
+        : `${d.label} was close to the ${run.dir === 'high' ? 'upper' : 'lower'} limit during ${span.toLowerCase()}.`;
+      out.push({ kind: 'band', level: run.level, metric: m, phase: run.phase, phases: run.phases, frame: run.frame, title: `${d.label} — ${span}`, msg, why: d.why, fix: d.fix, value: run.value, range: run.range, dev: run.dev }); run = null; };
+    for (const p of PHASES) {
+      const s = summary[m][p];
+      if (!s || (s.status !== 'bad' && s.status !== 'warn')) { flush(); continue; }
+      if (run && run.level === s.status && run.dir === s.dir) { run.phases.push(p); if (s.dev > run.dev) { run.dev = s.dev; run.frame = s.frame; run.value = s.value; run.range = s.range; run.phase = p; } }
+      else { flush(); run = { level: s.status, dir: s.dir, phases: [p], phase: p, dev: s.dev, frame: s.frame, value: s.value, range: s.range }; }
+    }
+    flush();
+  }
+  out.sort((a, b) => (WORST[b.level] - WORST[a.level]) || (b.dev - a.dev));
+  return out;
+}
+function namedFaults(sw, tol = {}) {
+  const M = sw.metrics, R = sw.ranges, out = [];
+  const T = id => tol[id] || 1; // per-fault tolerance multiplier (grows with "false alarm" feedback)
+  const maxIn = (m, phases) => { let best = -Infinity, bi = -1; for (const p of phases) for (let i = R[p][0]; i <= R[p][1]; i++) { if (M[m][i] > best) { best = M[m][i]; bi = i; } } return { v: best, i: bi }; };
+  const minIn = (m, phases) => { let best = Infinity, bi = -1; for (const p of phases) for (let i = R[p][0]; i <= R[p][1]; i++) { if (M[m][i] < best) { best = M[m][i]; bi = i; } } return { v: best, i: bi }; };
+  const at = (m, i) => M[m][i];
+  const addr = m => median(M[m].slice(R.address[0], R.address[1] + 1));
+  const imp = sw.keys.impact;
+  const push = (id, frame, detail, level = 'bad') => { const f = FAULTS[id]; out.push({ kind: 'named', id, level, title: f.name, msg: detail, why: f.meaning, fix: f.fix, frame, metric: f.metrics[0], phase: phaseOfFrame(R, frame).phase }); };
+  if (sw.view === 'dtl') {
+    const ht = maxIn('hipThrust', ['downswing', 'impact']); const tiltLoss = addr('spineTiltFwd') - at('spineTiltFwd', imp);
+    if (ht.v > 12 * T('earlyExtension') || (ht.v > 7 * T('earlyExtension') && tiltLoss > 8 * T('earlyExtension'))) push('earlyExtension', ht.i, `Hips moved ${fmt1(ht.v)}% of torso length toward the ball in the downswing${tiltLoss > 5 ? ` and spine tilt dropped ${fmt1(tiltLoss)}° from address to impact` : ''} — early extension.`);
+    else if (tiltLoss > 10 * T('lossOfPosture') || maxIn('headLift', ['downswing', 'impact']).v > 12 * T('lossOfPosture')) push('lossOfPosture', imp, `Forward spine tilt dropped ${fmt1(tiltLoss)}° between address and impact — you stood up before the ball was struck.`);
+    // over the top: hands further out on the way down than at the same height going back
+    const ds = R.downswing; let worst = 0, wi = -1; const back = []; for (let i = R.takeaway[0]; i <= R.top[1]; i++) back.push(i);
+    const dsEnd = ds[0] + Math.round((ds[1] - ds[0]) * 0.5);
+    for (let i = ds[0]; i <= dsEnd; i++) { const hh = M.handsHeight[i]; let bj = -1, bd = Infinity; for (const j of back) { const d = Math.abs(M.handsHeight[j] - hh); if (d < bd) { bd = d; bj = j; } } if (bj < 0 || bd > 15) continue; const diff = M.handsOut[i] - M.handsOut[bj]; if (diff > worst) { worst = diff; wi = i; } }
+    if (worst > 14 * T('overTheTop')) push('overTheTop', wi, `Early in the downswing the hands were ${fmt1(worst)}% of torso length further out toward the ball than they were at the same height going back.`);
+  } else {
+    const hs = maxIn('hipSway', ['backswing', 'top']);
+    if (hs.v > 14 * T('sway')) push('sway', hs.i, `Hips slid ${fmt1(hs.v)}% of your stance width away from the target in the backswing.`);
+    const wsTop = at('weightShift', sw.keys.top);
+    if (wsTop > 9 * T('reversePivot')) push('reversePivot', sw.keys.top, `At the top your hips were ${fmt1(wsTop)}% of stance width toward the target — weight on the lead side at the top.`);
+  }
+  // chicken wing (both views): lead arm bend within ~0.3 s after impact
+  const post = [imp, Math.min(M.leadArm.length - 1, imp + Math.round(sw.fps * 0.3))];
+  let la = Infinity, li = -1; for (let i = post[0]; i <= post[1]; i++) if (M.leadArm[i] < la) { la = M.leadArm[i]; li = i; }
+  if (la < 180 - 52 / T('chickenWing')) push('chickenWing', li, `Lead arm bent to ${Math.round(la)}° just after impact (180° is straight).`);
+  // casting (proxy): trail elbow straightens in the first half of the downswing
+  const half = R.downswing[0] + Math.round((R.downswing[1] - R.downswing[0]) * 0.5);
+  let te = -Infinity, ti = -1; for (let i = R.downswing[0]; i <= half; i++) if (M.trailElbow[i] > te) { te = M.trailElbow[i]; ti = i; }
+  const teTop = at('trailElbow', sw.keys.top);
+  if (te > 180 - 30 / T('casting') && teTop < 125) push('casting', ti, `Trail elbow straightened to ${Math.round(te)}° in the first half of the downswing (it was ${Math.round(teTop)}° at the top) — a casting pattern.`, 'warn');
+  return out;
+}
+
+/* ---------- Skeleton segments ---------- */
+function segmentsFor(hand) {
+  const sd = sidesFor(hand);
+  return {
+    head: [[0, 7], [0, 8]], shoulders: [[11, 12]], pelvis: [[23, 24]], torsoL: [[11, 23]], torsoR: [[12, 24]],
+    leadUpperArm: [[sd.lead.sh, sd.lead.el]], leadForearm: [[sd.lead.el, sd.lead.wr]], trailUpperArm: [[sd.trail.sh, sd.trail.el]], trailForearm: [[sd.trail.el, sd.trail.wr]],
+    leadThigh: [[sd.lead.hip, sd.lead.kn]], leadShin: [[sd.lead.kn, sd.lead.an]], trailThigh: [[sd.trail.hip, sd.trail.kn]], trailShin: [[sd.trail.kn, sd.trail.an]]
+  };
+}
+const SEG_COLOR = { good: '#2fb36a', warn: '#f0a500', bad: '#e5443a', na: '#aebfc9', none: '#8ec6ea' };
+
+/* =====================================================================
+   SwingCheck — app: profiles, player, screens
+   ===================================================================== */
+
+const App = { profiles: [], profile: null, cur: null, cancel: false, histSel: null };
+
+/* ---------- Profiles ---------- */
+function newProfile(name) { return { id: uid(), name, created: Date.now(), bands: {}, widen: {}, custom: {}, source: {}, namedTol: {} }; }
+async function loadProfiles() {
+  App.profiles = (await DB.all('profiles')).sort((a, b) => a.created - b.created);
+  if (!App.profiles.length) { for (const n of ['Irons', 'Driver']) { const p = newProfile(n); await DB.put('profiles', p); App.profiles.push(p); } }
+  App.profile = App.profiles.find(p => p.id === S.activeProfile) || App.profiles[0];
+  S.activeProfile = App.profile.id; saveSettings();
+}
+async function saveProfile(p) { await DB.put('profiles', p); }
+async function rebuildBands(p) { const refs = (await DB.all('refs')).filter(r => r.profileId === p.id); p.bands = buildBands(refs); await saveProfile(p); return refs; }
+function refCount(p, view) { let n = 0; const b = p.bands && p.bands[view]; if (b) for (const m in b) for (const ph in b[m]) n = Math.max(n, b[m][ph].n); return n; }
+
+/* ---------- Sheet / modal ---------- */
+function openSheet(html, onOpen) { $('#sheet').innerHTML = html; $('#sheetBack').classList.add('show'); if (onOpen) onOpen($('#sheet')); }
+function closeSheet() { $('#sheetBack').classList.remove('show'); $('#sheet').innerHTML = ''; }
+$('#sheetBack').addEventListener('click', e => { if (e.target === $('#sheetBack')) closeSheet(); });
+function confirmSheet(title, body, okLabel = 'OK', danger = false) {
+  return new Promise(res => {
+    openSheet(`<h2>${esc(title)}</h2><p class="muted">${body}</p><div class="grid2" style="margin-top:14px"><button class="btn ghost" id="shNo">Cancel</button><button class="btn ${danger ? 'danger' : ''}" id="shOk">${esc(okLabel)}</button></div>`);
+    $('#shNo').onclick = () => { closeSheet(); res(false); }; $('#shOk').onclick = () => { closeSheet(); res(true); };
+  });
+}
+function promptSheet(title, value = '', okLabel = 'Save') {
+  return new Promise(res => {
+    openSheet(`<h2>${esc(title)}</h2><input type="text" id="shIn" value="${esc(value)}" style="margin:8px 0 14px"><div class="grid2"><button class="btn ghost" id="shNo">Cancel</button><button class="btn" id="shOk">${esc(okLabel)}</button></div>`);
+    const i = $('#shIn'); i.focus(); i.select();
+    $('#shNo').onclick = () => { closeSheet(); res(null); }; $('#shOk').onclick = () => { const v = i.value.trim(); closeSheet(); res(v || null); };
+    i.onkeydown = e => { if (e.key === 'Enter') $('#shOk').click(); };
+  });
+}
+
+/* ---------- Navigation ---------- */
+function showScreen(name) {
+  $$('.screen').forEach(s => s.classList.toggle('active', s.id === 'scr-' + name));
+  $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.s === name));
+  if (name === 'history') renderHistory(); if (name === 'calibrate') renderCalibrate(); if (name === 'settings') renderSettings();
+  if (name !== 'analyse' && App.player) App.player.pause();
+  window.scrollTo(0, 0);
+}
+$$('#nav button').forEach(b => b.onclick = () => showScreen(b.dataset.s));
+
+/* ---------- Model status chip ---------- */
+function setModelChip(txt, cls = '') { const c = $('#modelChip'); c.textContent = txt; c.className = 'chip ' + cls; }
+async function warmModel() {
+  try { await Pose.ensure(S.model, (msg) => setModelChip(msg)); setModelChip(`Model: ${Pose.variant} · ${Pose.delegate}`, 'good'); }
+  catch (e) { console.warn(e); setModelChip('Model failed — tap to retry', 'bad'); }
+}
+$('#modelChip').onclick = () => { if (!Pose.landmarker && !Pose.loading) warmModel(); };
+
+/* =====================================================================
+   PLAYER — video + skeleton overlay, or skeleton-only replay
+   ===================================================================== */
+class Player {
+  constructor(container, rec, videoUrl) {
+    this.rec = rec; this.n = rec.lm.length; this.fps = rec.fps; this.idx = 0; this.rate = 1; this.playing = false; this.loopPhase = null; this.videoUrl = videoUrl;
+    this.container = container; this.mode = videoUrl ? 'video' : 'skeleton';
+    container.innerHTML = `<div class="player" id="plBox">${videoUrl ? '<video id="plVideo" playsinline muted preload="auto"></video>' : ''}<canvas id="plCanvas"></canvas><div class="phaseTag" id="plPhase"></div><div class="timeTag" id="plTime"></div></div>
+      <div class="scrubWrap"><div class="scrub" id="plScrub"><div class="track" id="plTrack"></div><div id="plMarks"></div><input type="range" id="plRange" min="0" max="${this.n - 1}" step="1" value="0"></div></div>
+      <div class="controls">
+        <button class="iconbtn" id="plBack" aria-label="previous frame">‹</button>
+        <button class="iconbtn" id="plPlay" aria-label="play" style="background:var(--pri);color:#fff">▶</button>
+        <button class="iconbtn" id="plFwd" aria-label="next frame">›</button>
+        <div class="seg" style="flex:1" id="plSpeed"><button data-r="0.25">¼×</button><button data-r="0.5">½×</button><button data-r="1" class="on">1×</button></div>
+        <button class="iconbtn" id="plLoop" title="Loop this phase">⟲</button>
+      </div>
+      <div class="legend"><span><i style="background:${SEG_COLOR.good}"></i>In range</span><span><i style="background:${SEG_COLOR.warn}"></i>Borderline</span><span><i style="background:${SEG_COLOR.bad}"></i>Out of range</span><span><i style="background:${SEG_COLOR.na}"></i>Not checked</span></div>`;
+    this.box = $('#plBox', container); this.canvas = $('#plCanvas', container); this.ctx = this.canvas.getContext('2d'); this.video = $('#plVideo', container);
+    this.range = $('#plRange', container);
+    const ar = rec.w / rec.h; this.box.style.aspectRatio = `${rec.w} / ${rec.h}`; if (ar > 1) this.box.style.maxHeight = '52vh';
+    if (this.video) { this.video.src = videoUrl; this.video.load(); }
+    this.segs = segmentsFor(rec.hand);
+    this.range.addEventListener('input', () => { this.pause(); this.seek(+this.range.value); });
+    $('#plPlay', container).onclick = () => this.playing ? this.pause() : this.play();
+    $('#plBack', container).onclick = () => { this.pause(); this.seek(this.idx - 1); };
+    $('#plFwd', container).onclick = () => { this.pause(); this.seek(this.idx + 1); };
+    $$('#plSpeed button', container).forEach(b => b.onclick = () => { $$('#plSpeed button', container).forEach(x => x.classList.remove('on')); b.classList.add('on'); this.rate = +b.dataset.r; if (this.video) this.video.playbackRate = this.rate; });
+    $('#plLoop', container).onclick = () => { const p = phaseOfFrame(this.rec.ranges, this.idx).phase; this.loopPhase = this.loopPhase === p ? null : p; $('#plLoop', container).style.background = this.loopPhase ? 'var(--good)' : ''; $('#plLoop', container).style.color = this.loopPhase ? '#fff' : ''; if (this.loopPhase) { this.seek(this.rec.ranges[p][0]); this.play(); } };
+    this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(this.box);
+    this.resize(); this.renderMarks(); this.seek(0);
+    this.raf = () => { this.tick(); this._raf = requestAnimationFrame(this.raf); }; this._raf = requestAnimationFrame(this.raf);
+  }
+  destroy() { cancelAnimationFrame(this._raf); this.ro.disconnect(); if (this.video) { this.video.pause(); this.video.removeAttribute('src'); this.video.load(); } }
+  setEval(ev) { this.ev = ev; this.renderMarks(); this.draw(); }
+  resize() { const r = this.box.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1; this.canvas.width = Math.round(r.width * dpr); this.canvas.height = Math.round(r.height * dpr); this.cw = r.width; this.ch = r.height; this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0); this.draw(); }
+  renderMarks() {
+    const marks = $('#plMarks', this.container), track = $('#plTrack', this.container); marks.innerHTML = ''; track.innerHTML = '';
+    const R = this.rec.ranges; const n = this.n;
+    PHASES.forEach((p, i) => { const [s, e] = R[p]; const seg = document.createElement('i'); seg.className = i % 2 ? 'alt' : ''; seg.style.left = (s / n * 100) + '%'; seg.style.width = ((e - s + 1) / n * 100) + '%'; track.appendChild(seg); });
+    if (this.ev) for (const f of this.ev.faults) { if (f.level !== 'bad') continue; const t = document.createElement('i'); t.className = 'red'; t.style.left = (f.frame / n * 100) + '%'; t.style.width = Math.max(1.5, 100 / n) + '%'; track.appendChild(t); }
+    for (const p of ['takeaway', 'top', 'impact', 'followthrough']) { const s = R[p][0]; const m = document.createElement('div'); m.className = 'mark' + (p === 'followthrough' ? ' lo' : ''); m.style.left = `calc(${s / n * 100}% - 1px)`; m.dataset.l = PHASE_SHORT[p]; marks.appendChild(m); }
+  }
+  get time() { return this.idx / this.fps; }
+  seek(i) { i = clamp(Math.round(i), 0, this.n - 1); this.idx = i; if (this.video) this.video.currentTime = i / this.fps + 0.001; this.range.value = i; this.draw(); }
+  play() { this.playing = true; $('#plPlay', this.container).textContent = '❚❚'; if (this.idx >= this.n - 1 && !this.loopPhase) this.seek(0); if (this.video) { this.video.playbackRate = this.rate; this.video.play().catch(() => { }); } this.t0 = performance.now(); this.i0 = this.idx; }
+  pause() { this.playing = false; $('#plPlay', this.container).textContent = '▶'; if (this.video) this.video.pause(); }
+  tick() {
+    if (!this.playing) return;
+    let i;
+    if (this.video) i = Math.round(this.video.currentTime * this.fps); else i = this.i0 + Math.floor((performance.now() - this.t0) / 1000 * this.rate * this.fps);
+    if (this.loopPhase) { const [s, e] = this.rec.ranges[this.loopPhase]; if (i > e || i < s) { this.seek(s); if (!this.video) { this.t0 = performance.now(); this.i0 = s; } return; } }
+    if (i >= this.n - 1) { this.seek(this.n - 1); if (this.video && this.video.ended) this.pause(); else if (!this.video) this.pause(); return; }
+    if (i !== this.idx) { this.idx = clamp(i, 0, this.n - 1); this.range.value = this.idx; this.draw(); }
+  }
+  contentRect() {
+    const vw = this.rec.w, vh = this.rec.h; const sc = Math.min(this.cw / vw, this.ch / vh); const w = vw * sc, h = vh * sc;
+    return { x: (this.cw - w) / 2, y: (this.ch - h) / 2, w, h };
+  }
+  draw() {
+    const ctx = this.ctx; if (!ctx || !this.cw) return; ctx.clearRect(0, 0, this.cw, this.ch);
+    const r = this.contentRect();
+    if (!this.video) { ctx.fillStyle = '#eaf4fb'; ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = '#d5e6f1'; ctx.lineWidth = 1; for (let g = 0; g <= 8; g++) { const y = r.y + r.h * g / 8; ctx.beginPath(); ctx.moveTo(r.x, y); ctx.lineTo(r.x + r.w, y); ctx.stroke(); } }
+    const lm = this.rec.lm[this.idx]; if (!lm) return;
+    const P = i => ({ x: r.x + lm[i][0] * r.w, y: r.y + lm[i][1] * r.h });
+    const st = this.ev ? this.ev.segStatus[this.idx] : {};
+    const lw = Math.max(3, r.w / 120);
+    // draw segments, grey/neutral first then coloured on top
+    const order = Object.keys(this.segs).sort((a, b) => (WORST[st[a] || 'none'] || 0) - (WORST[st[b] || 'none'] || 0));
+    for (const seg of order) {
+      const s = st[seg]; const col = s ? SEG_COLOR[s] : SEG_COLOR.none;
+      ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 3;
+      for (const [a, b] of this.segs[seg]) { const A = P(a), B = P(b); ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke(); }
+    }
+    ctx.shadowBlur = 0;
+    // joints
+    ctx.fillStyle = '#fff';
+    for (const i of [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]) { const p = P(i); ctx.beginPath(); ctx.arc(p.x, p.y, lw * 0.9, 0, Math.PI * 2); ctx.fill(); }
+    // head circle
+    const nose = P(0), le = P(7), re = P(8); const hr = Math.max(6, Math.hypot(le.x - re.x, le.y - re.y) * 0.8);
+    ctx.strokeStyle = st.head ? SEG_COLOR[st.head] : SEG_COLOR.none; ctx.lineWidth = lw * 0.8; ctx.beginPath(); ctx.arc((le.x + re.x) / 2, (le.y + re.y) / 2 - hr * 0.1, hr, 0, Math.PI * 2); ctx.stroke();
+    const ph = phaseOfFrame(this.rec.ranges, this.idx).phase;
+    $('#plPhase', this.container).textContent = PHASE_LABEL[ph];
+    $('#plTime', this.container).textContent = `${(this.idx / this.fps).toFixed(2)}s · f${this.idx}`;
+  }
+}
+
+/* =====================================================================
+   ANALYSE flow
+   ===================================================================== */
+const an = { pick: $('#an-pick'), setup: $('#an-setup'), prog: $('#an-progress'), result: $('#an-result') };
+function showAn(step) { for (const k in an) an[k].classList.toggle('hidden', k !== step); if (step !== 'result' && App.player) { App.player.destroy(); App.player = null; } }
+
+$('#fileInput').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return; e.target.value = '';
+  if (App.cur && App.cur.url) URL.revokeObjectURL(App.cur.url);
+  App.cur = { file: f, url: URL.createObjectURL(f), view: S.lastView, hand: S.hand, isRef: false };
+  const v = $('#setupVideo');
+  try { await loadVideoMeta(v, App.cur.url); } catch (err) { toast(err.message, 4000); return; }
+  if (v.duration > 20) { toast('Clip is too long (' + Math.round(v.duration) + 's). Trim it to one swing, under 20 s.', 5000); return; }
+  $('#setupPlayer').style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`;
+  v.currentTime = Math.min(0.5, v.duration / 3);
+  renderSetup(); showAn('setup');
+  quickGuessView(v);
+});
+function renderSetup() {
+  $$('#viewSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === App.cur.view));
+  $$('#handSeg button').forEach(b => b.classList.toggle('on', b.dataset.h === App.cur.hand));
+  $('#refToggle').classList.toggle('on', App.cur.isRef);
+  const sel = $('#profileSel'); sel.innerHTML = App.profiles.map(p => `<option value="${p.id}" ${p.id === App.profile.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+}
+$$('#viewSeg button').forEach(b => b.onclick = () => { App.cur.view = b.dataset.v; App.cur.viewManual = true; S.lastView = b.dataset.v; saveSettings(); renderSetup(); });
+$$('#handSeg button').forEach(b => b.onclick = () => { App.cur.hand = b.dataset.h; renderSetup(); });
+$('#refToggle').onclick = () => { App.cur.isRef = !App.cur.isRef; renderSetup(); };
+$('#profileSel').onchange = e => { App.profile = App.profiles.find(p => p.id === e.target.value); S.activeProfile = App.profile.id; saveSettings(); };
+$('#cancelSetup').onclick = () => { showAn('pick'); };
+async function quickGuessView(v) {
+  // one-frame pose at address to suggest the camera view
+  try {
+    await Pose.ensure(S.model, msg => setModelChip(msg)); setModelChip(`Model: ${Pose.variant} · ${Pose.delegate}`, 'good');
+    if (App.cur.viewManual) return;
+    await seekTo(v, Math.min(0.5, v.duration / 3));
+    const c = $('#workCanvas'); const sc = Math.min(1, 480 / Math.max(v.videoWidth, v.videoHeight)); c.width = Math.round(v.videoWidth * sc); c.height = Math.round(v.videoHeight * sc);
+    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+    Pose.reset(); const r = Pose.detect(c, 1);
+    if (r && r.landmarks && r.landmarks[0]) {
+      const lm = r.landmarks[0].map(p => [p.x, p.y, p.z, p.visibility ?? 0]); const g = frameGeom({ lm, wl: null }, v.videoWidth / v.videoHeight, 'R');
+      const guess = (g.shoulderW / g.torso) > 0.45 ? 'face' : 'dtl';
+      if (!App.cur.viewManual) { App.cur.view = guess; renderSetup(); $('#viewHint').textContent = `Auto-detected: ${VIEW_LABEL[guess]}. Change it if that's wrong.`; }
+    }
+  } catch (e) { console.warn('quick guess failed', e); }
+}
+
+$('#progCancel').onclick = () => { App.cancel = true; };
+$('#analyseBtn').onclick = () => runAnalysis();
+
+async function runAnalysis() {
+  const cur = App.cur; App.cancel = false; showAn('prog');
+  const setP = (title, sub, frac) => { if (title) $('#progTitle').textContent = title; if (sub != null) $('#progSub').textContent = sub; if (frac != null) { $('#progBar').style.width = (frac * 100) + '%'; $('#progPct').textContent = Math.round(frac * 100) + '%'; } };
+  try {
+    setP('Preparing…', 'Loading the pose model (first time only, ~30 MB).', 0);
+    await Pose.ensure(S.model, (msg, f) => setP(null, msg, (f || 0) * 0.1));
+    setModelChip(`Model: ${Pose.variant} · ${Pose.delegate}`, 'good');
+    const wv = $('#workVideo'); await loadVideoMeta(wv, cur.url);
+    setP('Analysing…', 'Finding your body in each frame. Keep the app open.', 0.1);
+    const ext = await extractPoses(wv, { fps: S.fps, maxRes: S.maxRes }, (f, fps) => { setP(null, null, 0.1 + f * 0.85); $('#progFps').textContent = fps ? fps.toFixed(1) + ' fps' : ''; }, () => App.cancel);
+    setP('Checking…', 'Cleaning up the pose data.', 0.96);
+    const cleaned = cleanFrames(ext.frames);
+    const prob = footageProblems(cleaned, ext.w, ext.h);
+    if (prob) { showFootageProblem(prob); return; }
+    let sw = computeSwing(cleaned.frames, ext.w, ext.h, ext.fps, { hand: cur.hand, view: cur.view, det: S.det, applyAutoHand: false });
+    if (sw.error) { showFootageProblem({ title: 'Could not find a swing', tips: [sw.error] }); return; }
+    // handedness confirmation
+    if (sw.autoHand && sw.autoHand !== cur.hand) {
+      const ok = await confirmSheet('Different handedness detected', `This looks like a <b>${sw.autoHand === 'R' ? 'right' : 'left'}-handed</b> swing but you selected ${cur.hand === 'R' ? 'right' : 'left'}-handed. Analyse it as ${sw.autoHand === 'R' ? 'right' : 'left'}-handed?<br><small>(If the video is mirrored, the detected answer is the one to use.)</small>`, `Use ${sw.autoHand === 'R' ? 'right' : 'left'}-handed`);
+      if (ok) { cur.hand = sw.autoHand; sw = computeSwing(cleaned.frames, ext.w, ext.h, ext.fps, { hand: cur.hand, view: cur.view, det: S.det }); }
+    }
+    if (!cur.viewManual && sw.autoView !== cur.view) toast(`Note: this clip looks like ${VIEW_LABEL[sw.autoView]}. You chose ${VIEW_LABEL[cur.view]}.`, 4000);
+    const rec = makeRecord(sw, cleaned.frames, ext, cur);
+    rec.quality = Math.round(cleaned.quality * 100);
+    await DB.put('history', rec);
+    if (cur.isRef) await addReference(rec);
+    App.curRec = rec;
+    renderResult(rec, cur.url);
+    showAn('result');
+    if (cur.isRef) toast('Saved as a reference swing ✓');
+  } catch (err) {
+    if (err.message === 'cancelled') { showAn('setup'); return; }
+    console.error(err); showFootageProblem({ title: 'Analysis failed', tips: [err.message || String(err), 'If this keeps happening, try the Lite model in Settings or a shorter clip.'] });
+  }
+}
+function showFootageProblem(p) {
+  an.result.innerHTML = `<div class="card"><div class="notice bad"><b>${esc(p.title)}</b><ul style="margin:8px 0 0;padding-left:18px">${p.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>
+    <div class="grid2" style="margin-top:12px"><button class="btn ghost" onclick="showAn('setup')">Back</button><button class="btn" onclick="showAn('pick')">Choose another clip</button></div></div>`;
+  showAn('result');
+}
+function makeRecord(sw, frames, ext, cur) {
+  const r3 = v => Math.round(v * 1000) / 1000;
+  const M = {}; for (const m of metricsForView(sw.view)) M[m] = sw.metrics[m].map(v => isFinite(v) ? Math.round(v * 10) / 10 : null);
+  return {
+    id: uid(), profileId: App.profile.id, date: Date.now(), view: sw.view, hand: sw.hand, fps: ext.fps, w: ext.w, h: ext.h, duration: ext.duration, n: frames.length,
+    lm: frames.map(f => f.lm.map(p => [r3(p[0]), r3(p[1]), r3(p[2]), Math.round(p[3] * 100) / 100])),
+    metrics: M, keys: sw.keys, ranges: sw.ranges, dirs: sw.dirs, speedProfile: { addrY: sw.addrY, topY: sw.topY, peak: sw.peak, speed: sw.speed.map(v => Math.round(v * 100) / 100), handsY: sw.hands.y.map(r3) },
+    isRef: !!cur.isRef, refId: null, scores: null
+  };
+}
+function swFromRecord(rec) {
+  const metrics = {}; for (const m in rec.metrics) metrics[m] = rec.metrics[m].map(v => v == null ? NaN : v);
+  return { metrics, ranges: rec.ranges, keys: rec.keys, view: rec.view, hand: rec.hand, fps: rec.fps };
+}
+async function addReference(rec) {
+  const sw = swFromRecord(rec);
+  const ref = { id: uid(), profileId: rec.profileId, historyId: rec.id, view: rec.view, hand: rec.hand, date: rec.date, resampled: resampleSwing(sw.metrics, sw.ranges, rec.view) };
+  await DB.put('refs', ref); rec.isRef = true; rec.refId = ref.id; await DB.put('history', rec);
+  const p = App.profiles.find(x => x.id === rec.profileId); if (p) await rebuildBands(p);
+}
+async function removeReference(rec) {
+  if (rec.refId) await DB.del('refs', rec.refId); rec.isRef = false; rec.refId = null; await DB.put('history', rec);
+  const p = App.profiles.find(x => x.id === rec.profileId); if (p) await rebuildBands(p);
+}
+
+/* ---------- Result screen ---------- */
+function renderResult(rec, videoUrl, container = an.result) {
+  const profile = App.profiles.find(p => p.id === rec.profileId) || App.profile;
+  const ev = evaluateSwing(swFromRecord(rec), profile);
+  rec.scores = ev.scores; rec.faultCount = ev.faults.filter(f => f.level === 'bad').length; DB.put('history', rec);
+  const nRef = refCount(profile, rec.view);
+  container.innerHTML = `
+    <div class="card" style="padding:10px"><div id="playerHost"></div></div>
+    <div class="card">
+      <div class="score">
+        <div class="ring"><canvas id="ringC" width="168" height="168"></canvas><b>${ev.scores.overall}%</b></div>
+        <div style="flex:1">
+          <h2>${scoreWord(ev.scores.overall)}</h2>
+          <small>${ev.passed} of ${ev.checks} checks passed · ${VIEW_LABEL[rec.view]} · ${rec.hand === 'R' ? 'Right' : 'Left'}-handed · ${esc(profile.name)}</small><br>
+          <small>${nRef >= 3 ? `Compared against <b>your calibrated ranges</b> (${nRef} reference swings)` : nRef > 0 ? `Mostly <b>default ranges</b> — ${nRef} reference swing${nRef > 1 ? 's' : ''} so far, add ${3 - nRef} more to switch to your own` : '<b>Default ranges</b> — add reference swings in Calibrate to personalise'}</small>
+        </div>
+      </div>
+      <div class="phaseScores">${PHASES.map(p => `<div><b>${ev.scores[p] == null ? '–' : ev.scores[p] + '%'}</b><div class="bar"><i style="width:${ev.scores[p] || 0}%;background:${scoreColor(ev.scores[p])}"></i></div>${PHASE_SHORT[p]}</div>`).join('')}</div>
+    </div>
+    <div class="card">
+      <div class="row between"><h2>Faults</h2><span class="chip ${rec.faultCount ? 'bad' : 'good'}">${rec.faultCount ? rec.faultCount + ' found' : 'None found'}</span></div>
+      <div id="faultList" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <details><summary>Compare with your reference bands</summary><p class="muted" style="font-size:13px">Blue line = this swing. Green band = your acceptable range (calibrated where available, otherwise default). Vertical lines = phase boundaries.</p><div id="cmpGraphs"></div></details>
+    </div>
+    <div class="card stack">
+      ${rec.isRef ? `<div class="notice good">This swing is one of your reference swings.</div><button class="btn block ghost" id="unrefBtn">Remove from references</button>` : `<button class="btn block good" id="refBtn">👍 This was a good swing — use as reference</button>`}
+      <button class="btn block secondary" id="phaseBtn">Adjust phase markers</button>
+      ${videoUrl ? `<button class="btn block" id="anotherBtn">Analyse another swing</button>` : ''}
+      <small class="muted">Confidence: pose quality ${rec.quality || '–'}%. Turn/X-factor are estimates from single-camera 3D — trust trends more than single numbers.</small>
+    </div>`;
+  if (App.player) App.player.destroy();
+  App.player = new Player($('#playerHost', container), rec, videoUrl); App.player.setEval(ev);
+  drawRing($('#ringC', container), ev.scores.overall);
+  renderFaults(rec, ev, profile, container);
+  renderCompare(rec, profile, $('#cmpGraphs', container));
+  const rb = $('#refBtn', container); if (rb) rb.onclick = async () => { await addReference(rec); toast('Added to reference swings ✓'); renderResult(rec, videoUrl, container); };
+  const ub = $('#unrefBtn', container); if (ub) ub.onclick = async () => { await removeReference(rec); renderResult(rec, videoUrl, container); };
+  $('#phaseBtn', container).onclick = () => openPhaseEditor(rec, videoUrl, container);
+  const ab = $('#anotherBtn', container); if (ab) ab.onclick = () => { showAn('pick'); $('#fileInput').click(); };
+}
+const scoreWord = s => s >= 90 ? 'Excellent' : s >= 75 ? 'Good swing' : s >= 55 ? 'Getting there' : 'Work to do';
+const scoreColor = s => s == null ? '#aebfc9' : s >= 80 ? SEG_COLOR.good : s >= 55 ? SEG_COLOR.warn : SEG_COLOR.bad;
+function drawRing(c, pct) { const x = c.getContext('2d'); const r = 70, cx = 84, cy = 84; x.clearRect(0, 0, 168, 168); x.lineWidth = 14; x.lineCap = 'round'; x.strokeStyle = '#e6f2fa'; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.stroke(); x.strokeStyle = scoreColor(pct); x.beginPath(); x.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct / 100); x.stroke(); }
+function renderFaults(rec, ev, profile, container) {
+  const host = $('#faultList', container); const bad = ev.faults.filter(f => f.level === 'bad'), warn = ev.faults.filter(f => f.level === 'warn');
+  const item = f => `<div class="fault ${f.level === 'warn' ? 'warn' : ''}"><div class="dot"></div><div class="body">
+      <div class="title">${esc(f.title)}</div><div class="meta">${PHASE_LABEL[f.phase]} · ${(f.frame / rec.fps).toFixed(2)}s${f.range ? ` · range ${fmt1(f.range.lo)}–${fmt1(f.range.hi)}${METRICS[f.metric].unit} (${f.range.source})` : ''}</div>
+      <div>${esc(f.msg)}</div><div class="muted" style="font-size:13px;margin-top:4px">${esc(f.why)}</div><div class="fix" style="margin-top:4px"><b>Fix:</b> ${esc(f.fix)}</div>
+      <div class="acts"><button data-act="jump" data-f="${f.frame}">▶ Jump to moment</button><button data-act="fa" data-i="${ev.faults.indexOf(f)}">False alarm — widen</button></div></div></div>`;
+  host.innerHTML = (bad.length ? bad.map(item).join('') : `<div class="notice good">No out-of-range checks. ${warn.length ? 'A few borderline ones below.' : 'Nice.'}</div>`) +
+    (warn.length ? `<details style="margin-top:6px"><summary>${warn.length} borderline (amber)</summary>${warn.map(item).join('')}</details>` : '');
+  $$('button[data-act]', host).forEach(b => b.onclick = async () => {
+    if (b.dataset.act === 'jump') { App.player.pause(); App.player.seek(+b.dataset.f); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    const f = ev.faults[+b.dataset.i];
+    if (f.kind === 'band') { profile.widen[rec.view] = profile.widen[rec.view] || {}; profile.widen[rec.view][f.metric] = profile.widen[rec.view][f.metric] || {}; const cur = profile.widen[rec.view][f.metric][f.phase] || 1; profile.widen[rec.view][f.metric][f.phase] = Math.min(2.5, cur * 1.15); }
+    else { profile.namedTol = profile.namedTol || {}; profile.namedTol[f.id] = Math.min(2, (profile.namedTol[f.id] || 1) * 1.15); }
+    await saveProfile(profile); toast('Tolerance widened 15% for this check. Reset in Calibrate.');
+    renderResult(rec, App.player.videoUrl, container); if (App.player) App.player.seek(f.frame);
+  });
+}
+function renderCompare(rec, profile, host) {
+  const sw = swFromRecord(rec); const n = rec.n; host.innerHTML = '';
+  for (const m of metricsForView(rec.view)) {
+    const d = METRICS[m]; const vals = sw.metrics[m]; if (!vals.some(v => isFinite(v))) continue;
+    const g = document.createElement('div'); g.className = 'graph'; g.innerHTML = `<div class="gh"><b>${esc(d.label)}</b><span class="muted">${d.unit === '°' ? 'degrees' : '%'}</span></div><canvas></canvas>`; host.appendChild(g);
+    const c = $('canvas', g); const dpr = window.devicePixelRatio || 1; const W = c.clientWidth || 320, H = 110; c.width = W * dpr; c.height = H * dpr; const x = c.getContext('2d'); x.scale(dpr, dpr);
+    // gather band
+    const lo = [], hi = []; let mn = Infinity, mx = -Infinity;
+    for (let i = 0; i < n; i++) { const { phase, u } = phaseOfFrame(rec.ranges, i); const r = rangeFor(profile, rec.view, m, phase, u); lo.push(r ? r.lo : NaN); hi.push(r ? r.hi : NaN); if (r) { mn = Math.min(mn, r.lo); mx = Math.max(mx, r.hi); } if (isFinite(vals[i])) { mn = Math.min(mn, vals[i]); mx = Math.max(mx, vals[i]); } }
+    if (!isFinite(mn)) continue; const pad = (mx - mn) * 0.1 + 1; mn -= pad; mx += pad;
+    const X = i => 8 + (W - 16) * i / (n - 1), Y = v => H - 8 - (H - 16) * (v - mn) / (mx - mn);
+    // band
+    x.fillStyle = 'rgba(47,179,106,.18)'; x.beginPath(); let started = false;
+    for (let i = 0; i < n; i++) { if (!isFinite(hi[i])) { if (started) { for (let j = i - 1; j >= 0 && isFinite(lo[j]); j--) x.lineTo(X(j), Y(lo[j])); x.closePath(); x.fill(); started = false; } continue; } if (!started) { x.beginPath(); x.moveTo(X(i), Y(hi[i])); started = true; } else x.lineTo(X(i), Y(hi[i])); }
+    if (started) { for (let j = n - 1; j >= 0 && isFinite(lo[j]); j--) x.lineTo(X(j), Y(lo[j])); x.closePath(); x.fill(); }
+    // phase lines
+    x.strokeStyle = '#d5e6f1'; x.lineWidth = 1; for (const p of PHASES) { const s = rec.ranges[p][0]; x.beginPath(); x.moveTo(X(s), 4); x.lineTo(X(s), H - 4); x.stroke(); }
+    // value line
+    x.strokeStyle = '#2a86c2'; x.lineWidth = 2; x.beginPath(); let pen = false; for (let i = 0; i < n; i++) { if (!isFinite(vals[i])) { pen = false; continue; } if (!pen) { x.moveTo(X(i), Y(vals[i])); pen = true; } else x.lineTo(X(i), Y(vals[i])); } x.stroke();
+    // out-of-range dots
+    x.fillStyle = SEG_COLOR.bad; for (let i = 0; i < n; i++) if (isFinite(vals[i]) && isFinite(lo[i]) && (vals[i] < lo[i] || vals[i] > hi[i])) { x.beginPath(); x.arc(X(i), Y(vals[i]), 2, 0, Math.PI * 2); x.fill(); }
+    x.fillStyle = '#5b7386'; x.font = '10px -apple-system,sans-serif'; x.fillText(fmt1(mx - pad), 10, 12); x.fillText(fmt1(mn + pad), 10, H - 10);
+  }
+}
+
+/* ---------- Phase editor (manual nudge + threshold learning) ---------- */
+function openPhaseEditor(rec, videoUrl, container) {
+  const K = { t0: rec.keys.t0, t1: rec.keys.t1 ?? rec.ranges.backswing[0], top: rec.keys.top, impact: rec.keys.impact };
+  const items = [['t0', 'Takeaway starts'], ['t1', 'Backswing starts (hands pass hip height)'], ['top', 'Top of backswing'], ['impact', 'Impact']];
+  const html = `<h2>Adjust phase markers</h2><p class="muted" style="font-size:13px">Scrub the video to the right frame, then tap <b>Set</b> next to the phase. Corrections to Takeaway and Impact also teach the detector for future clips.</p>
+    ${items.map(([k, l]) => `<div class="kv"><span>${l}<br><small id="pe-${k}">frame ${K[k]}</small></span><span class="row"><button class="btn small ghost" data-k="${k}" data-d="-1">−1</button><button class="btn small ghost" data-k="${k}" data-d="1">+1</button><button class="btn small secondary" data-k="${k}" data-set="1">Set</button></span></div>`).join('')}
+    <div class="grid2" style="margin-top:14px"><button class="btn ghost" id="peCancel">Cancel</button><button class="btn" id="peApply">Apply</button></div>`;
+  openSheet(html, sh => {
+    const upd = () => { for (const [k] of items) $('#pe-' + k, sh).textContent = `frame ${K[k]} · ${(K[k] / rec.fps).toFixed(2)}s`; };
+    $$('button[data-k]', sh).forEach(b => b.onclick = () => { const k = b.dataset.k; if (b.dataset.set) K[k] = App.player.idx; else K[k] = clamp(K[k] + +b.dataset.d, 0, rec.n - 1); App.player.seek(K[k]); upd(); });
+    $('#peCancel', sh).onclick = closeSheet;
+    $('#peApply', sh).onclick = async () => {
+      // learn thresholds from corrections
+      const sp = rec.speedProfile;
+      if (sp && K.t0 !== rec.keys.t0 && sp.speed && sp.peak) { const rel = clamp(sp.speed[K.t0] / sp.peak, 0.03, 0.5); S.det.moveStart = Math.round((0.7 * S.det.moveStart + 0.3 * rel) * 1000) / 1000; }
+      if (sp && K.impact !== rec.keys.impact && sp.handsY) { const frac = (sp.handsY[K.impact] - sp.topY) / ((sp.addrY - sp.topY) || 1); if (isFinite(frac)) S.det.impactFrac = Math.round(clamp(0.7 * S.det.impactFrac + 0.3 * frac, 0.5, 1.15) * 1000) / 1000; }
+      saveSettings();
+      // enforce order and rebuild ranges
+      K.t0 = clamp(K.t0, 1, rec.n - 6); K.t1 = clamp(K.t1, K.t0 + 1, rec.n - 5); K.top = clamp(K.top, K.t1 + 1, rec.n - 4); K.impact = clamp(K.impact, K.top + 2, rec.n - 2);
+      rec.keys = { ...rec.keys, ...K }; rec.ranges = phaseRanges(rec.keys, rec.n, rec.fps);
+      await DB.put('history', rec);
+      if (rec.isRef) { await DB.del('refs', rec.refId); rec.refId = null; await addReference(rec); }
+      closeSheet(); toast('Phases updated'); renderResult(rec, videoUrl, container);
+    };
+    upd();
+  });
+}
+
+/* =====================================================================
+   SwingCheck — History, Calibrate, Settings, backup, init
+   ===================================================================== */
+
+/* ---------- History ---------- */
+async function renderHistory() {
+  const host = $('#histBody'); const all = (await DB.all('history')).sort((a, b) => b.date - a.date);
+  $('#histCount').textContent = all.length ? all.length + ' swings' : '';
+  if (App.histSel) { const rec = all.find(r => r.id === App.histSel); if (rec) return renderHistoryDetail(rec, host); App.histSel = null; }
+  if (!all.length) { host.innerHTML = `<div class="card empty"><div class="art"><svg viewBox="0 0 48 48" fill="none"><path d="M8 34l10-10 8 8 14-16" stroke="#4aa8e0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="40" cy="16" r="4" fill="#2fb36a"/></svg></div><h2>No swings yet</h2><p class="muted">Analyse your first swing and it will appear here with a score trend over time.</p><button class="btn" onclick="showScreen('analyse')">Go to Analyse</button></div>`; return; }
+  const profOpts = `<option value="">All profiles</option>` + App.profiles.map(p => `<option value="${p.id}" ${App.histFilter === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+  const list = all.filter(r => !App.histFilter || r.profileId === App.histFilter);
+  host.innerHTML = `<div class="card"><div class="row between"><h2>Score trend</h2><select id="histProf" style="width:auto;min-height:38px;padding:6px 30px 6px 10px;font-size:14px">${profOpts}</select></div><div class="trend"><canvas id="trendC"></canvas></div><small class="muted" id="trendNote"></small></div>
+    <div class="card" style="padding:6px 12px">${list.map(r => `<div class="item" data-id="${r.id}"><div class="sc ${scoreCls(r.scores && r.scores.overall)}">${r.scores ? r.scores.overall + '%' : '–'}</div><div class="t"><b>${dateStr(r.date)} ${r.isRef ? '⭐' : ''}</b><small>${VIEW_LABEL[r.view]} · ${esc((App.profiles.find(p => p.id === r.profileId) || {}).name || '?')} · ${r.faultCount || 0} fault${r.faultCount === 1 ? '' : 's'}</small></div><span class="muted">›</span></div>`).join('')}</div>`;
+  $('#histProf').onchange = e => { App.histFilter = e.target.value || null; renderHistory(); };
+  $$('.item[data-id]', host).forEach(el => el.onclick = () => { App.histSel = el.dataset.id; renderHistory(); });
+  drawTrend($('#trendC'), list.slice().reverse());
+}
+const scoreCls = s => s == null ? '' : s >= 80 ? 'g' : s >= 55 ? 'a' : 'r';
+function drawTrend(c, recs) {
+  const dpr = window.devicePixelRatio || 1; const W = c.clientWidth || 320, H = 160; c.width = W * dpr; c.height = H * dpr; const x = c.getContext('2d'); x.scale(dpr, dpr);
+  const pts = recs.filter(r => r.scores).map(r => ({ t: r.date, v: r.scores.overall, view: r.view }));
+  $('#trendNote').textContent = pts.length < 2 ? 'Analyse a few more swings to see a trend.' : `${pts.length} swings · latest ${pts[pts.length - 1].v}% · best ${Math.max(...pts.map(p => p.v))}%`;
+  x.strokeStyle = '#e6f2fa'; x.lineWidth = 1; for (const g of [0, 25, 50, 75, 100]) { const y = H - 14 - (H - 28) * g / 100; x.beginPath(); x.moveTo(30, y); x.lineTo(W - 8, y); x.stroke(); x.fillStyle = '#5b7386'; x.font = '10px -apple-system,sans-serif'; x.fillText(g + '%', 2, y + 3); }
+  if (!pts.length) return;
+  const X = i => 30 + (W - 42) * (pts.length > 1 ? i / (pts.length - 1) : 0.5), Y = v => H - 14 - (H - 28) * v / 100;
+  // moving average of 3
+  if (pts.length >= 3) { x.strokeStyle = 'rgba(47,179,106,.5)'; x.lineWidth = 6; x.lineCap = 'round'; x.beginPath(); for (let i = 0; i < pts.length; i++) { const a = pts.slice(Math.max(0, i - 2), i + 1); const m = a.reduce((s, p) => s + p.v, 0) / a.length; i ? x.lineTo(X(i), Y(m)) : x.moveTo(X(i), Y(m)); } x.stroke(); }
+  x.strokeStyle = '#2a86c2'; x.lineWidth = 2; x.beginPath(); pts.forEach((p, i) => i ? x.lineTo(X(i), Y(p.v)) : x.moveTo(X(i), Y(p.v))); x.stroke();
+  pts.forEach((p, i) => { x.fillStyle = p.view === 'face' ? '#2a86c2' : '#4aa8e0'; x.beginPath(); x.arc(X(i), Y(p.v), 4, 0, Math.PI * 2); x.fill(); x.strokeStyle = '#fff'; x.lineWidth = 1.5; x.stroke(); });
+}
+function renderHistoryDetail(rec, host) {
+  host.innerHTML = `<button class="btn small ghost" id="histBack" style="margin-bottom:10px">‹ All swings</button><div class="card soft" style="padding:10px 14px"><b>${dateStr(rec.date)}</b><br><small>${VIEW_LABEL[rec.view]} · ${rec.hand === 'R' ? 'Right' : 'Left'}-handed · ${rec.fps} fps · ${rec.n} frames · skeleton replay (video is not stored)</small></div><div id="histResult"></div><button class="btn block danger" id="histDel">Delete this swing</button>`;
+  $('#histBack').onclick = () => { App.histSel = null; renderHistory(); };
+  $('#histDel').onclick = async () => { if (!await confirmSheet('Delete swing?', 'This removes the analysis' + (rec.isRef ? ' and its reference data' : '') + '. This cannot be undone.', 'Delete', true)) return; if (rec.isRef) await removeReference(rec); await DB.del('history', rec.id); App.histSel = null; renderHistory(); };
+  renderResult(rec, null, $('#histResult'));
+}
+
+/* ---------- Calibrate ---------- */
+async function renderCalibrate() {
+  const p = App.profile; const sel = $('#calProfileSel');
+  sel.innerHTML = App.profiles.map(x => `<option value="${x.id}" ${x.id === p.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
+  sel.onchange = e => { App.profile = App.profiles.find(x => x.id === e.target.value); S.activeProfile = App.profile.id; saveSettings(); renderCalibrate(); };
+  $('#calProfileActs').innerHTML = `<button class="btn small ghost" id="calRename">Rename</button><button class="btn small ghost" id="calResetWiden">Reset tolerances</button>${App.profiles.length > 1 ? '<button class="btn small danger" id="calDelete">Delete profile</button>' : ''}`;
+  $('#calRename').onclick = async () => { const n = await promptSheet('Profile name', p.name); if (n) { p.name = n; await saveProfile(p); renderCalibrate(); } };
+  $('#calResetWiden').onclick = async () => { p.widen = {}; p.namedTol = {}; await saveProfile(p); toast('All false-alarm widening reset'); renderCalibrate(); };
+  const del = $('#calDelete'); if (del) del.onclick = async () => { if (!await confirmSheet('Delete profile?', `Deletes "${esc(p.name)}", its reference swings and history.`, 'Delete', true)) return; for (const r of await DB.all('refs')) if (r.profileId === p.id) await DB.del('refs', r.id); for (const r of await DB.all('history')) if (r.profileId === p.id) await DB.del('history', r.id); await DB.del('profiles', p.id); App.profiles = App.profiles.filter(x => x.id !== p.id); App.profile = App.profiles[0]; S.activeProfile = App.profile.id; saveSettings(); renderCalibrate(); };
+  const refs = (await DB.all('refs')).filter(r => r.profileId === p.id).sort((a, b) => b.date - a.date);
+  const nf = refs.filter(r => r.view === 'face').length, nd = refs.filter(r => r.view === 'dtl').length;
+  const view = App.calView || 'face';
+  const conf = n => n === 0 ? 'Using default ranges. Add 3 reference swings to calibrate.' : n < 3 ? `Based on ${n} swing${n > 1 ? 's' : ''} — add ${3 - n} more for reliability (defaults still used until then unless you force calibrated per metric).` : n < 6 ? `Based on ${n} swings — decent. More swings tighten the bands.` : `Based on ${n} swings — good confidence.`;
+  const body = $('#calBody');
+  body.innerHTML = `
+    <div class="card">
+      <h2>How calibration works</h2>
+      <p class="muted" style="font-size:14px">The pose model itself never changes. What improves is <b>your</b> reference profile: each swing you mark as a reference adds to the mean and spread of every metric per phase. Red/green thresholds are mean ± 2 SD (never tighter than a sensible minimum). Marking a red segment as a false alarm widens that one check by 15%.</p>
+      <div class="grid2" style="margin-top:8px"><div class="card soft" style="margin:0;padding:12px"><div class="bigstat">${nf}</div><small>Face-on references</small><br><small class="calib">${conf(nf)}</small></div><div class="card soft" style="margin:0;padding:12px"><div class="bigstat">${nd}</div><small>Down-the-line references</small><br><small class="calib">${conf(nd)}</small></div></div>
+      <button class="btn block good" style="margin-top:12px" id="calAdd">＋ Add a reference swing</button>
+    </div>
+    <div class="card">
+      <div class="row between"><h2>Ranges</h2><div class="seg" style="width:190px" id="calViewSeg"><button data-v="face" class="${view === 'face' ? 'on' : ''}">Face-on</button><button data-v="dtl" class="${view === 'dtl' ? 'on' : ''}">DTL</button></div></div>
+      <small class="muted">Tap a metric to see and edit its per-phase ranges. <b>Auto</b> uses your calibrated range once 3+ references exist, otherwise the default.</small>
+      <div id="calRanges" style="margin-top:6px"></div>
+    </div>
+    <div class="card"><h2>Reference swings</h2><div id="calRefs" style="margin-top:6px">${refs.length ? '' : '<small class="muted">None yet. Analyse a swing you are happy with and tap "This was a good swing", or toggle "reference" before analysing.</small>'}</div></div>`;
+  $('#calAdd').onclick = () => { showScreen('analyse'); App.cur = null; showAn('pick'); $('#calibHint').classList.remove('hidden'); $('#calibHint').innerHTML = '<b>Reference mode:</b> pick a swing you are happy with. The "reference" toggle will be on.'; App.pendingRef = true; $('#fileInput').click(); };
+  $$('#calViewSeg button').forEach(b => b.onclick = () => { App.calView = b.dataset.v; renderCalibrate(); });
+  renderRanges(p, view, $('#calRanges'));
+  const rh = $('#calRefs');
+  rh.innerHTML += refs.map(r => `<div class="item"><div class="sc">⭐</div><div class="t"><b>${dateStr(r.date)}</b><small>${VIEW_LABEL[r.view]} · ${r.hand === 'R' ? 'Right' : 'Left'}-handed</small></div><button class="btn small danger" data-del="${r.id}">Remove</button></div>`).join('');
+  $$('button[data-del]', rh).forEach(b => b.onclick = async () => { const r = refs.find(x => x.id === b.dataset.del); const h = await DB.get('history', r.historyId); if (h) { h.isRef = false; h.refId = null; await DB.put('history', h); } await DB.del('refs', r.id); await rebuildBands(p); renderCalibrate(); });
+}
+function renderRanges(p, view, host) {
+  host.innerHTML = '';
+  for (const m of metricsForView(view)) {
+    const d = METRICS[m]; const band = p.bands[view] && p.bands[view][m]; const n = band ? Math.max(...Object.values(band).map(b => b.n)) : 0;
+    const src = p.source[m] || 'auto'; const using = (src === 'calibrated' && n > 0) || (src === 'auto' && n >= 3) ? 'calibrated' : (p.custom[view] && p.custom[view][m] && Object.values(p.custom[view][m]).some(Boolean)) ? 'custom' : 'default';
+    const row = document.createElement('div'); row.className = 'rangeRow';
+    row.innerHTML = `<div class="hd"><div><b>${esc(d.label)}</b>${d.estimate ? ' <span class="chip grey">est.</span>' : ''}<br><small class="calib">${n ? `calibrated from ${n} swing${n > 1 ? 's' : ''}` : 'no calibration yet'}</small></div>
+      <div class="row"><span class="chip ${using === 'calibrated' ? 'good' : using === 'custom' ? 'warn' : 'grey'}">${using === 'calibrated' ? 'Your ranges' : using === 'custom' ? 'Custom' : 'Default'}</span><select data-src style="width:auto;min-height:36px;padding:4px 28px 4px 8px;font-size:13px"><option value="auto" ${src === 'auto' ? 'selected' : ''}>Auto</option><option value="calibrated" ${src === 'calibrated' ? 'selected' : ''}>Calibrated</option><option value="default" ${src === 'default' ? 'selected' : ''}>Default/custom</option></select></div></div>
+      <div class="detail"><small class="muted">${esc(d.why)}</small>
+        <div style="overflow-x:auto;margin-top:6px"><table class="rt"><tr><th>Phase</th><th>Default min</th><th>Default max</th><th>Calibrated (mean ± tol)</th><th>Widen</th></tr>
+        ${PHASES.map(ph => { const def = d.def[ph]; const cus = p.custom[view] && p.custom[view][m] && p.custom[view][m][ph]; const b = band && band[ph]; const mid = Math.floor(BAND_K / 2); const w = (p.widen[view] && p.widen[view][m] && p.widen[view][m][ph]) || 1;
+          return `<tr><td style="text-align:left">${PHASE_SHORT[ph]}</td><td><input type="number" step="1" data-ph="${ph}" data-k="0" value="${cus ? cus[0] : def ? def[0] : ''}" placeholder="–"></td><td><input type="number" step="1" data-ph="${ph}" data-k="1" value="${cus ? cus[1] : def ? def[1] : ''}" placeholder="–"></td><td>${b ? `${fmt1(b.mean[mid])} ± ${fmt1(Math.max(2 * b.std[mid], d.minTol) * w)}` : '–'}</td><td>${w > 1 ? `×${fmt1(w)} <button class="btn small ghost" data-rw="${ph}" style="min-height:26px;padding:2px 6px;font-size:11px">reset</button>` : '–'}</td></tr>`; }).join('')}
+        </table></div>
+        <div class="row" style="margin-top:8px"><button class="btn small ghost" data-restore>Restore defaults</button><small class="muted">Edits are saved as custom ranges.</small></div></div>`;
+    host.appendChild(row);
+    $('.hd', row).onclick = e => { if (e.target.tagName === 'SELECT') return; row.classList.toggle('open'); };
+    $('select[data-src]', row).onchange = async e => { p.source[m] = e.target.value; await saveProfile(p); renderRanges(p, view, host); };
+    $$('input[data-ph]', row).forEach(inp => inp.onchange = async () => {
+      const ph = inp.dataset.ph; p.custom[view] = p.custom[view] || {}; p.custom[view][m] = p.custom[view][m] || {};
+      const lo = $(`input[data-ph="${ph}"][data-k="0"]`, row).value, hi = $(`input[data-ph="${ph}"][data-k="1"]`, row).value;
+      p.custom[view][m][ph] = (lo === '' || hi === '') ? null : [+lo, +hi]; if (p.custom[view][m][ph] && p.custom[view][m][ph][0] > p.custom[view][m][ph][1]) p.custom[view][m][ph].reverse();
+      await saveProfile(p); toast('Custom range saved');
+    });
+    $('button[data-restore]', row).onclick = async () => { if (p.custom[view]) delete p.custom[view][m]; await saveProfile(p); renderRanges(p, view, host); };
+    $$('button[data-rw]', row).forEach(b => b.onclick = async e => { e.stopPropagation(); p.widen[view][m][b.dataset.rw] = 1; await saveProfile(p); renderRanges(p, view, host); });
+  }
+}
+$('#newProfileBtn').onclick = async () => { const n = await promptSheet('New profile name', '', 'Create'); if (!n) return; const p = newProfile(n); await saveProfile(p); App.profiles.push(p); App.profile = p; S.activeProfile = p.id; saveSettings(); renderCalibrate(); };
+
+/* ---------- Settings ---------- */
+async function renderSettings() {
+  const host = $('#setBody');
+  const cachedHeavy = await isCached(MODEL_URLS.heavy), cachedLite = await isCached(MODEL_URLS.lite), cachedFull = await isCached(MODEL_URLS.full), cachedLib = await isCached(`${MP_BASE}/vision_bundle.mjs`);
+  const usage = await estimateUsage();
+  host.innerHTML = `
+    <div class="card stack">
+      <h2>Pose model</h2>
+      <label class="field"><span class="lbl">Accuracy vs speed</span><select id="setModel"><option value="heavy" ${S.model === 'heavy' ? 'selected' : ''}>Heavy — most accurate (default)</option><option value="full" ${S.model === 'full' ? 'selected' : ''}>Full — balanced</option><option value="lite" ${S.model === 'lite' ? 'selected' : ''}>Lite — fastest, if the phone struggles</option></select></label>
+      <small class="muted">Cached for offline: library ${cachedLib ? '✓' : '✗'} · heavy ${cachedHeavy ? '✓' : '✗'} · full ${cachedFull ? '✓' : '✗'} · lite ${cachedLite ? '✓' : '✗'}. Current: ${Pose.landmarker ? Pose.variant + ' on ' + Pose.delegate : 'not loaded'}.</small>
+      <div class="grid2"><button class="btn secondary" id="setDownload">Download model now</button><button class="btn ghost" id="setClearCache">Clear cached models</button></div>
+    </div>
+    <div class="card stack">
+      <h2>Analysis</h2>
+      <label class="field"><span class="lbl">Default handedness</span><select id="setHand"><option value="R" ${S.hand === 'R' ? 'selected' : ''}>Right-handed</option><option value="L" ${S.hand === 'L' ? 'selected' : ''}>Left-handed</option></select></label>
+      <label class="field"><span class="lbl">Frames analysed per second</span><select id="setFps"><option value="24" ${S.fps == 24 ? 'selected' : ''}>24 (faster)</option><option value="30" ${S.fps == 30 ? 'selected' : ''}>30 (default)</option><option value="60" ${S.fps == 60 ? 'selected' : ''}>60 (slow-mo clips, 2× slower)</option></select></label>
+      <label class="field"><span class="lbl">Internal processing resolution</span><select id="setRes"><option value="540" ${S.maxRes == 540 ? 'selected' : ''}>540p (fastest)</option><option value="720" ${S.maxRes == 720 ? 'selected' : ''}>720p (default)</option><option value="1080" ${S.maxRes == 1080 ? 'selected' : ''}>1080p (slowest)</option></select></label>
+      <div class="kv"><span>Phase detection thresholds<br><small>Learned from your manual corrections</small></span><span style="text-align:right"><small>start ${S.det.moveStart} · impact ${S.det.impactFrac}</small><br><button class="btn small ghost" id="setResetDet">Reset</button></span></div>
+    </div>
+    <div class="card stack">
+      <h2>Backup</h2>
+      <p class="muted" style="font-size:14px">Everything lives on this phone (${usage}). Export a JSON backup now and then — deleting the app or clearing Safari data wipes it.</p>
+      <div class="grid2"><button class="btn" id="setExport">Export JSON</button><button class="btn secondary" id="setImport">Import JSON</button></div>
+      <button class="btn block danger" id="setWipe">Delete all data</button>
+    </div>
+    <div class="card stack">
+      <h2>Offline & install</h2>
+      <p class="muted" style="font-size:14px"><b>Install:</b> in Safari tap Share → <b>Add to Home Screen</b>. The app then opens full-screen.</p>
+      <p class="muted" style="font-size:14px"><b>Offline:</b> the pose library and model are cached on this phone after the first analysis, so analysis works without signal. The page itself is served from wherever you host it; ${window.__swOK ? 'a service worker is active, so the page is cached too ✓' : 'to make the page load with no signal at all, host the optional <code>sw.js</code> file next to this HTML file (see the build notes). Without it, iOS usually still opens the installed app from its cache.'}</p>
+      <p class="muted" style="font-size:14px"><b>Honest limits:</b> a single phone camera gives 2D joint positions, so turn/X-factor are rough estimates and DTL knee angles are approximate. Use it for trends and clear faults, not launch-monitor precision.</p>
+    </div>
+    <div class="card"><small class="muted">SwingCheck · MediaPipe Pose Landmarker ${MP_VER} · no accounts, no servers, no tracking.</small></div>`;
+  $('#setModel').onchange = e => { S.model = e.target.value; saveSettings(); warmModel().then(renderSettings); };
+  $('#setHand').onchange = e => { S.hand = e.target.value; saveSettings(); };
+  $('#setFps').onchange = e => { S.fps = +e.target.value; saveSettings(); };
+  $('#setRes').onchange = e => { S.maxRes = +e.target.value; saveSettings(); };
+  $('#setResetDet').onclick = () => { S.det = { ...DEFAULT_SETTINGS.det }; saveSettings(); renderSettings(); toast('Detection thresholds reset'); };
+  $('#setDownload').onclick = () => warmModel().then(renderSettings);
+  $('#setClearCache').onclick = async () => { await clearAssetCache(); toast('Cache cleared — it will re-download next time'); renderSettings(); };
+  $('#setExport').onclick = exportJSON;
+  $('#setImport').onclick = () => $('#importInput').click();
+  $('#setWipe').onclick = async () => { if (!await confirmSheet('Delete all data?', 'Profiles, reference swings and history will be wiped from this phone. Export a backup first if you might want it.', 'Delete everything', true)) return; await DB.clear('profiles'); await DB.clear('refs'); await DB.clear('history'); localStorage.removeItem('swingcheck.settings'); S = loadSettings(); await loadProfiles(); toast('All data deleted'); renderSettings(); };
+}
+async function estimateUsage() { try { if (navigator.storage && navigator.storage.estimate) { const e = await navigator.storage.estimate(); return Math.round((e.usage || 0) / 1024 / 1024 * 10) / 10 + ' MB used'; } } catch (e) { } return 'storage size unknown'; }
+async function exportJSON() {
+  const data = { app: 'SwingCheck', version: 1, exported: Date.now(), settings: S, profiles: await DB.all('profiles'), refs: await DB.all('refs'), history: await DB.all('history') };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' }); const name = `swingcheck-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  try {
+    const file = new File([blob], name, { type: 'application/json' });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'SwingCheck backup' }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+}
+$('#importInput').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text()); if (data.app !== 'SwingCheck') throw new Error('Not a SwingCheck backup');
+    const merge = await confirmSheet('Import backup', `${(data.profiles || []).length} profiles, ${(data.refs || []).length} reference swings, ${(data.history || []).length} analyses. Merge into the data on this phone?`, 'Import');
+    if (!merge) return;
+    for (const p of data.profiles || []) await DB.put('profiles', p); for (const r of data.refs || []) await DB.put('refs', r); for (const h of data.history || []) await DB.put('history', h);
+    if (data.settings) { S = { ...S, ...data.settings, det: { ...S.det, ...(data.settings.det || {}) } }; saveSettings(); }
+    await loadProfiles(); for (const p of App.profiles) await rebuildBands(p);
+    toast('Backup imported ✓'); renderSettings();
+  } catch (err) { toast('Import failed: ' + err.message, 4000); }
+});
+
+/* ---------- Init ---------- */
+(async function init() {
+  setupPWA();
+  try { await loadProfiles(); } catch (e) { console.error(e); toast('Storage unavailable — is this a private window?', 5000); }
+  if (App.pendingRef) { }
+  // reference-mode hint hook: when the picker opens from Calibrate, pre-enable the toggle
+  $('#fileInput').addEventListener('change', () => { if (App.pendingRef) { setTimeout(() => { if (App.cur) { App.cur.isRef = true; renderSetup(); } App.pendingRef = false; $('#calibHint').classList.add('hidden'); }, 50); } });
+  const hist = await DB.all('history').catch(() => []);
+  if (!hist.length) { $('#an-emptyTitle').textContent = 'Record your first swing'; }
+  else { const refs = await DB.all('refs').catch(() => []); if (refs.length < 3) { $('#an-emptyTitle').textContent = 'Analyse a swing'; $('#an-emptySub').textContent = `Add ${3 - refs.length} more reference swing${3 - refs.length > 1 ? 's' : ''} to calibrate your own ranges.`; } else { $('#an-emptyTitle').textContent = 'Analyse a swing'; $('#an-emptySub').textContent = 'Your calibrated ranges are active. Keep adding good swings to tighten them.'; } }
+  warmModel();
+  window.addEventListener('error', e => console.warn('window error', e.message));
+})();
+
+</script>
+</body>
+</html>
