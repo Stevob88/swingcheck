@@ -611,7 +611,7 @@ const METRICS = {
     why: 'The lead knee should stay softly flexed until it straightens through impact. Straightening too early lifts you out of posture; over-bending drops you.',
     fix: 'Keep a soft, "athletic" lead knee — think "knees over laces" at address and keep the flex until the ball is gone.' },
   trailKneeFlex: { label: 'Trail knee flex', unit: '°', views: ['face', 'dtl'], segs: ['trailThigh', 'trailShin'], minTol: 4,
-    def: { address: [15, 35], takeaway: [15, 35], backswing: [10, 35], top: [10, 35], downswing: [10, 40], impact: [15, 50], followthrough: [5, 45] },
+    def: { address: [15, 35], takeaway: [15, 35], backswing: [8, 35], top: [8, 35], downswing: [10, 40], impact: [15, 50], followthrough: [5, 45] },
     high: 'trail knee more bent than usual', low: 'trail knee straighter than usual',
     why: 'Keeping trail-knee flex in the backswing stops the hips sliding and stores power. A locked trail knee usually means a sway or reverse pivot.',
     fix: 'Feel the trail knee stay bent and pointing at the ball during the backswing, like you are sitting into the trail hip.' },
@@ -695,28 +695,67 @@ const METRIC_IDS = Object.keys(METRICS);
 const metricsForView = v => METRIC_IDS.filter(m => METRICS[m].views.includes(v));
 
 /* ---------- Fault dictionary (named faults) ---------- */
+const GD = 'https://www.golfdistillery.com/';
 const FAULTS = {
-  earlyExtension: { name: 'Early extension', views: ['dtl'], metrics: ['hipThrust', 'spineTiltFwd'],
+  earlyExtension: { name: 'Early extension', views: ['dtl'], metrics: ['hipThrust', 'spineTiltFwd'], src: GD + 'swing-errors/failing-to-maintain-your-spine-angle/',
     meaning: 'Your hips moved toward the ball and your body stood up in the downswing instead of keeping the tilt you had at address. It crowds the arms, causing blocks, hooks and thin shots.',
     fix: 'Set up with your backside against a chair or wall and keep it touching through impact. Feel your chest stay down over the ball.' },
-  lossOfPosture: { name: 'Loss of posture', views: ['dtl'], metrics: ['spineTiltFwd', 'headLift'],
-    meaning: 'You stood up out of your address posture before the ball was struck, so the club arrives at a different height than you set up for.',
+  lossOfPosture: { name: 'Standing up at impact', views: ['dtl'], metrics: ['spineTiltFwd', 'headLift'], src: GD + 'swing-errors/standing-up-at-impact/',
+    meaning: 'You changed your forward spine angle before the ball was struck, so the club arrives higher than you set up for. Golf Distillery lists this as a classic cause of topped and thin shots.',
     fix: 'Keep the same forward bend from address to impact. Rehearse slow swings with your head lightly touching a wall in front of you.' },
-  sway: { name: 'Sway', views: ['face'], metrics: ['hipSway', 'headSway'],
-    meaning: 'Your hips (and often head) slid sideways away from the target in the backswing rather than turning. It makes it hard to get back to the ball consistently.',
-    fix: 'Put an alignment stick or bag just outside your trail hip and turn without touching it. Keep the trail knee flexed.' },
-  reversePivot: { name: 'Reverse pivot', views: ['face'], metrics: ['weightShift', 'spineTiltSide'],
-    meaning: 'Your weight moved toward the target at the top of the backswing (and then falls back in the downswing) — the opposite of a good weight shift. It costs power and causes fat and thin shots.',
+  sway: { name: 'Sway', views: ['face'], metrics: ['hipSway', 'headSway'], src: GD + 'swing-errors/sway/',
+    meaning: 'Your hips slid sideways away from the target in the backswing rather than turning. Weight gets stuck on the trail side and it is hard to get back to the ball consistently — fat shots and hooks follow.',
+    fix: 'Put an alignment stick or bag just outside your trail hip and turn without touching it. Keep the trail knee flexed and the pressure on the inside of the trail foot.' },
+  slide: { name: 'Hip slide', views: ['face'], metrics: ['hipSway'], src: GD + 'swing-errors/blocking-shots/',
+    meaning: 'Your hips slid a long way toward the target in the downswing instead of rotating. The arms get stuck behind the body, which typically produces pushes and blocks to the right.',
+    fix: 'Feel the lead hip turn back and behind you (clear) rather than driving toward the target. Keep the head behind the ball.' },
+  reversePivot: { name: 'Reverse pivot', views: ['face'], metrics: ['weightShift', 'spineTiltSide'], src: GD + 'swing-errors/reverse-pivot/',
+    meaning: 'Your weight moved toward the target at the top of the backswing and then falls back in the downswing — the opposite of a good weight shift. It costs power and produces fat shots, thin shots and pulls.',
     fix: 'Feel your weight load into the trail heel at the top with your head behind the ball, then move toward the target starting down.' },
-  chickenWing: { name: 'Chicken wing', views: ['face', 'dtl'], metrics: ['leadArm'],
-    meaning: 'Your lead elbow bent and pulled up/out just after impact instead of the arms extending toward the target. Usually a sign of the body stalling or steering the shot.',
-    fix: 'Rehearse slow swings to hip height past impact with both arms straight and the club pointing at the target. Keep the body turning.' },
-  casting: { name: 'Casting', views: ['face', 'dtl'], metrics: ['trailElbow'],
-    meaning: 'The trail elbow straightened early in the downswing (proxy for the wrists releasing too soon), throwing the clubhead from the top. It loses speed and causes fat or weak shots.',
+  hangingBack: { name: 'Hanging back', views: ['face'], metrics: ['weightShift'], src: GD + 'shot-errors/how-to-fix-fat/',
+    meaning: 'At impact your hip centre was still behind your feet — the weight never came through to the lead side. The low point of the swing moves back behind the ball, causing fat and thin strikes and hooks.',
+    fix: 'Finish with your belt buckle facing the target and all your weight on the lead foot. Try the step-through drill: let the trail foot walk forward after impact.' },
+  chickenWing: { name: 'Chicken wing', views: ['face', 'dtl'], metrics: ['leadArm'], src: GD + 'swing-errors/blocking-shots/',
+    meaning: 'Your lead elbow bent and pulled up just after impact instead of the arms extending toward the target. Usually a sign the body stalled or you steered the shot — it costs distance and produces weak slices.',
+    fix: 'Rehearse slow swings to hip height past impact with both arms straight and the club pointing at the target. Keep the body turning through.' },
+  casting: { name: 'Casting', views: ['face', 'dtl'], metrics: ['trailElbow'], src: GD + 'swing-errors/casting/',
+    meaning: 'The trail elbow straightened early in the downswing (a proxy for the wrists releasing too soon), throwing the clubhead from the top. Lag is lost, so the club bottoms out early: fat shots, weak slices and loss of distance.',
     fix: 'Start down with the lower body and keep the trail elbow close to your side — like skipping a stone or hammering a nail with the wrist angle held.' },
-  overTheTop: { name: 'Over the top', views: ['dtl'], metrics: ['handsOut'],
-    meaning: 'On the way down your hands travelled further out toward the ball than on the way back, so the club approaches from outside the target line — the usual cause of slices and pulls.',
-    fix: 'Feel the hands drop and the trail elbow tuck at the start of the downswing, then swing out toward right field (right-handers).' }
+  overTheTop: { name: 'Over the top', views: ['dtl'], metrics: ['handsOut'], src: GD + 'swing-errors/over-the-top/',
+    meaning: 'On the way down your hands travelled further out toward the ball than they went back, so the club approaches from outside the target line — the number one cause of slices and pulls.',
+    fix: 'Feel the hands drop and the trail elbow tuck at the start of the downswing, then swing out toward right field (right-handers).' },
+  overSwing: { name: 'Over swing', views: ['face', 'dtl'], metrics: ['leadArm', 'shoulderTurn'], src: GD + 'swing-errors/over-swing/',
+    meaning: 'The backswing went past the point where the body can control it — the lead arm collapsed at the top. Extra length feels powerful but costs control and consistency.',
+    fix: 'Stop the backswing when the lead arm is parallel to the ground or just above, keeping it comfortably straight. Turn the shoulders more instead of lifting the arms further.' },
+  shortSwing: { name: 'Short swing', views: ['face', 'dtl'], metrics: ['handsHeight', 'shoulderTurn'], src: GD + 'swing-errors/short-swing/',
+    meaning: 'The backswing stopped short — hands stayed below shoulder height with a small body turn. It limits distance and often leads to a quick, snatched downswing.',
+    fix: 'Turn the lead shoulder under your chin and let the hands reach at least shoulder height at the top. Tempo: count "one-and" to the top.' },
+  allArms: { name: 'All-arms swing', views: ['face', 'dtl'], metrics: ['shoulderTurn', 'handsHeight'], src: GD + 'swing-errors/all-arms-swing/',
+    meaning: 'The arms lifted high but the body hardly turned. Without the body coil the arms have to do all the work, which is inconsistent and weak.',
+    fix: 'Feel your back turn toward the target in the backswing. Drill: cross your arms over your chest and rehearse the shoulder turn, then swing keeping that feeling.' },
+  lockedTrailKnee: { name: 'Locked trail knee', views: ['face'], metrics: ['trailKneeFlex'], src: GD + 'swing-errors/locking-your-right-knee/',
+    meaning: 'Your trail knee straightened (locked) during the backswing. That lets the hips over-rotate or sway and makes it hard to push off the trail side coming down.',
+    fix: 'Keep the trail knee flexed and pointing at the ball throughout the backswing, like you are sitting into the trail hip.' },
+  lockedLeadKneeImpact: { name: 'Locked lead knee at impact', views: ['face'], metrics: ['leadKneeFlex'], src: GD + 'swing-errors/locking-your-left-knee-at-impact/',
+    meaning: 'The lead knee snapped fully straight before impact. The upper body then rises with it, which raises the swing bottom and produces thin and topped shots.',
+    fix: 'Keep a little softness in the lead knee through impact and let it straighten into the finish, not before.' },
+  decel: { name: 'Decelerating into impact', views: ['face', 'dtl'], metrics: ['handsHeight'], src: GD + 'swing-errors/decel/',
+    meaning: 'Hand speed dropped noticeably between the fastest part of the downswing and impact. Slowing down into the ball is usually a steering move and costs distance and consistency.',
+    fix: 'Swing through the ball, not at it. Feel the fastest point of the swing just after the ball, and finish in balance.' },
+  offBalance: { name: 'Off-balance finish', views: ['face'], metrics: ['headSway', 'weightShift'], src: GD + 'swing-errors/off-balance-swing/',
+    meaning: 'At the finish your body was still moving sideways or your weight had not settled on the lead foot — a sign the swing was too hard or the sequence was off.',
+    fix: 'Swing at 80% and hold the finish for three seconds, weight on the lead foot, trail toe on the ground.' }
+};
+/* Shot outcomes the app cannot see — you tag them, and the app links them to the body faults that typically cause them (mapping informed by Golf Distillery's shot-error pages). */
+const SHOTS = {
+  good: { label: 'Good', cls: 'good' },
+  slice: { label: 'Slice', src: GD + 'shot-errors/how-to-fix-slice/', cause: 'Outside-in club path with a face open to that path.', faults: ['overTheTop', 'reversePivot', 'casting', 'chickenWing', 'allArms', 'shortSwing'] },
+  hook: { label: 'Hook', src: GD + 'shot-errors/how-to-fix-hook/', cause: 'Inside-out path with a face closed to that path.', faults: ['earlyExtension', 'hangingBack', 'sway', 'lockedTrailKnee', 'casting'] },
+  push: { label: 'Push', src: GD + 'shot-errors/how-to-fix-push/', cause: 'Inside-out path, face square to the path (blocked).', faults: ['slide', 'earlyExtension', 'hangingBack', 'sway'] },
+  pull: { label: 'Pull', src: GD + 'shot-errors/how-to-fix-pull/', cause: 'Outside-in path, face square to the path.', faults: ['overTheTop', 'reversePivot', 'lossOfPosture', 'chickenWing'] },
+  fat: { label: 'Fat', src: GD + 'shot-errors/how-to-fix-fat/', cause: 'Bottom of the swing arc too early / too low.', faults: ['hangingBack', 'sway', 'casting', 'reversePivot', 'decel', 'overSwing'] },
+  thin: { label: 'Thin', src: GD + 'shot-errors/how-to-fix-thin/', cause: 'Bottom of the swing arc too high / too soon.', faults: ['lossOfPosture', 'earlyExtension', 'lockedLeadKneeImpact', 'chickenWing', 'reversePivot', 'casting'] },
+  top: { label: 'Top', src: GD + 'shot-errors/how-to-fix-top/', cause: 'Bottom of the swing arc too high, or too early/late.', faults: ['lossOfPosture', 'earlyExtension', 'chickenWing', 'overSwing', 'offBalance', 'lockedLeadKneeImpact'] }
 };
 
 /* ---------- Geometry helpers ---------- */
@@ -1005,6 +1044,28 @@ function namedFaults(sw, tol = {}) {
   let te = -Infinity, ti = -1; for (let i = R.downswing[0]; i <= half; i++) if (M.trailElbow[i] > te) { te = M.trailElbow[i]; ti = i; }
   const teTop = at('trailElbow', sw.keys.top);
   if (te > 180 - 30 / T('casting') && teTop < 125) push('casting', ti, `Trail elbow straightened to ${Math.round(te)}° in the first half of the downswing (it was ${Math.round(teTop)}° at the top) — a casting pattern.`, 'warn');
+  // --- Golf Distillery swing errors detectable from body pose ---
+  const top = sw.keys.top, hhTop = at('handsHeight', top), stTop = at('shoulderTurn', top), laTop = at('leadArm', top);
+  if (isFinite(laTop) && laTop < 180 - 45 / T('overSwing')) push('overSwing', top, `Lead arm collapsed to ${Math.round(laTop)}° at the top — the backswing went further than the arm could stay straight.`, 'warn');
+  else if (isFinite(hhTop) && hhTop < 85 * T('shortSwing') && (!isFinite(stTop) || stTop < 70)) push('shortSwing', top, `At the top the hands were only ${Math.round(hhTop)}% of torso length above the hips (shoulder height is about 100%)${isFinite(stTop) ? ` with an estimated ${Math.round(stTop)}° shoulder turn` : ''}.`, 'warn');
+  else if (isFinite(hhTop) && isFinite(stTop) && hhTop > 100 && stTop < 55 / T('allArms')) push('allArms', top, `Hands reached ${Math.round(hhTop)}% of torso height but the shoulders only turned an estimated ${Math.round(stTop)}° — the arms did the work.`, 'warn');
+  if (sw.speed && sw.speed.length) {
+    let pk = 0, pi = -1; for (let i = R.downswing[0]; i <= imp; i++) if (sw.speed[i] > pk) { pk = sw.speed[i]; pi = i; }
+    const si = sw.speed[imp];
+    if (pk > 0 && pi < imp - 1 && si < pk * (0.6 / T('decel'))) push('decel', imp, `Hand speed at impact was ${Math.round(si / pk * 100)}% of the downswing peak — you slowed down into the ball.`, 'warn');
+  }
+  if (sw.view === 'face') {
+    const tkAddr = addr('trailKneeFlex'), tkMin = minIn('trailKneeFlex', ['backswing', 'top']);
+    if (tkAddr >= 12 && tkMin.v < 5 * T('lockedTrailKnee')) push('lockedTrailKnee', tkMin.i, `Trail knee straightened to ${Math.round(tkMin.v)}° of flex in the backswing (it was ${Math.round(tkAddr)}° at address).`);
+    const lkAddr = addr('leadKneeFlex'), lkImp = at('leadKneeFlex', imp);
+    if (lkAddr >= 12 && lkImp < 3 * T('lockedLeadKneeImpact')) push('lockedLeadKneeImpact', imp, `Lead knee was fully straight (${Math.round(lkImp)}° flex) at impact.`, 'warn');
+    const wsImp = at('weightShift', imp);
+    if (wsImp < -5 / T('hangingBack')) push('hangingBack', imp, `At impact your hip centre was ${fmt1(-wsImp)}% of stance width behind where it was at address — weight still on the trail side.`);
+    const hsImp = minIn('hipSway', ['downswing', 'impact']);
+    if (hsImp.v < -38 * T('slide')) push('slide', hsImp.i, `Hips slid ${fmt1(-hsImp.v)}% of stance width toward the target before impact.`);
+    const last = M.headSway.length - 1;
+    if (Math.abs(M.headSway[last]) > 45 * T('offBalance') || at('weightShift', last) < 10 / T('offBalance')) push('offBalance', last, `At the finish the head was ${Math.round(Math.abs(M.headSway[last]))}% of stance width off centre and the hips had only shifted ${Math.round(at('weightShift', last))}% of stance width toward the target (a balanced finish is usually 20%+).`, 'warn');
+  }
   return out;
 }
 
@@ -1262,7 +1323,7 @@ function makeRecord(sw, frames, ext, cur) {
 }
 function swFromRecord(rec) {
   const metrics = {}; for (const m in rec.metrics) metrics[m] = rec.metrics[m].map(v => v == null ? NaN : v);
-  return { metrics, ranges: rec.ranges, keys: rec.keys, view: rec.view, hand: rec.hand, fps: rec.fps };
+  return { metrics, ranges: rec.ranges, keys: rec.keys, view: rec.view, hand: rec.hand, fps: rec.fps, speed: rec.speedProfile && rec.speedProfile.speed };
 }
 async function addReference(rec) {
   const sw = swFromRecord(rec);
@@ -1276,10 +1337,12 @@ async function removeReference(rec) {
 }
 
 /* ---------- Result screen ---------- */
-function renderResult(rec, videoUrl, container = an.result) {
-  const profile = App.profiles.find(p => p.id === rec.profileId) || App.profile;
+function renderResult(rec, videoUrl, container = an.result, judgeId = null) {
+  const ownProfile = App.profiles.find(p => p.id === rec.profileId) || App.profile;
+  const profile = (judgeId && App.profiles.find(p => p.id === judgeId)) || ownProfile;
   const ev = evaluateSwing(swFromRecord(rec), profile);
-  rec.scores = ev.scores; rec.faultCount = ev.faults.filter(f => f.level === 'bad').length; DB.put('history', rec);
+  if (profile === ownProfile) { rec.scores = ev.scores; rec.faultCount = ev.faults.filter(f => f.level === 'bad').length; rec.faultIds = ev.faults.filter(f => f.kind === 'named').map(f => f.id); DB.put('history', rec); }
+  const judging = profile !== ownProfile;
   const nRef = refCount(profile, rec.view);
   container.innerHTML = `
     <div class="card" style="padding:10px"><div id="playerHost"></div></div>
@@ -1293,6 +1356,13 @@ function renderResult(rec, videoUrl, container = an.result) {
         </div>
       </div>
       <div class="phaseScores">${PHASES.map(p => `<div><b>${ev.scores[p] == null ? '–' : ev.scores[p] + '%'}</b><div class="bar"><i style="width:${ev.scores[p] || 0}%;background:${scoreColor(ev.scores[p])}"></i></div>${PHASE_SHORT[p]}</div>`).join('')}</div>
+      ${App.profiles.length > 1 ? `<div class="row between" style="margin-top:12px"><small class="muted">Judge against</small><select id="judgeSel" style="width:auto;min-height:36px;padding:4px 28px 4px 8px;font-size:13px">${App.profiles.map(p => `<option value="${p.id}" ${p.id === profile.id ? 'selected' : ''}>${esc(p.name)}${p.id === rec.profileId ? ' (this swing)' : ''}</option>`).join('')}</select></div>${judging ? `<div class="notice info" style="margin-top:8px;font-size:13px">Scored against <b>${esc(profile.name)}</b> — e.g. a pro profile. Your saved score stays as judged by ${esc(ownProfile.name)}.</div>` : ''}` : ''}
+    </div>
+    <div class="card">
+      <div class="row between"><h2>What did the shot do?</h2>${rec.shot ? `<span class="chip ${rec.shot === 'good' ? 'good' : 'bad'}">${SHOTS[rec.shot].label}</span>` : ''}</div>
+      <small class="muted">The app can't see the ball — tag the result and it links your body faults to it.</small>
+      <div class="pill-list" style="margin-top:8px" id="shotPills">${Object.keys(SHOTS).map(k => `<button class="chip ${rec.shot === k ? (k === 'good' ? 'good' : 'bad') : 'grey'}" data-shot="${k}" style="min-height:36px;padding:6px 14px;font-size:13px">${SHOTS[k].label}</button>`).join('')}</div>
+      <div id="shotCauses" style="margin-top:10px"></div>
     </div>
     <div class="card">
       <div class="row between"><h2>Faults</h2><span class="chip ${rec.faultCount ? 'bad' : 'good'}">${rec.faultCount ? rec.faultCount + ' found' : 'None found'}</span></div>
@@ -1311,6 +1381,8 @@ function renderResult(rec, videoUrl, container = an.result) {
   App.player = new Player($('#playerHost', container), rec, videoUrl); App.player.setEval(ev);
   drawRing($('#ringC', container), ev.scores.overall);
   renderFaults(rec, ev, profile, container);
+  renderShot(rec, ev, container, videoUrl, judgeId);
+  const js = $('#judgeSel', container); if (js) js.onchange = e => renderResult(rec, videoUrl, container, e.target.value === rec.profileId ? null : e.target.value);
   renderCompare(rec, profile, $('#cmpGraphs', container));
   const rb = $('#refBtn', container); if (rb) rb.onclick = async () => { await addReference(rec); toast('Added to reference swings ✓'); renderResult(rec, videoUrl, container); };
   const ub = $('#unrefBtn', container); if (ub) ub.onclick = async () => { await removeReference(rec); renderResult(rec, videoUrl, container); };
@@ -1324,7 +1396,7 @@ function renderFaults(rec, ev, profile, container) {
   const host = $('#faultList', container); const bad = ev.faults.filter(f => f.level === 'bad'), warn = ev.faults.filter(f => f.level === 'warn');
   const item = f => `<div class="fault ${f.level === 'warn' ? 'warn' : ''}"><div class="dot"></div><div class="body">
       <div class="title">${esc(f.title)}</div><div class="meta">${PHASE_LABEL[f.phase]} · ${(f.frame / rec.fps).toFixed(2)}s${f.range ? ` · range ${fmt1(f.range.lo)}–${fmt1(f.range.hi)}${METRICS[f.metric].unit} (${f.range.source})` : ''}</div>
-      <div>${esc(f.msg)}</div><div class="muted" style="font-size:13px;margin-top:4px">${esc(f.why)}</div><div class="fix" style="margin-top:4px"><b>Fix:</b> ${esc(f.fix)}</div>
+      <div>${esc(f.msg)}</div><div class="muted" style="font-size:13px;margin-top:4px">${esc(f.why)}</div><div class="fix" style="margin-top:4px"><b>Fix:</b> ${esc(f.fix)}${f.kind === 'named' && FAULTS[f.id].src ? ` <a href="${FAULTS[f.id].src}" target="_blank" rel="noopener" style="color:var(--pri-text);white-space:nowrap">Read more ↗</a>` : ''}</div>
       <div class="acts"><button data-act="jump" data-f="${f.frame}">▶ Jump to moment</button><button data-act="fa" data-i="${ev.faults.indexOf(f)}">False alarm — widen</button></div></div></div>`;
   host.innerHTML = (bad.length ? bad.map(item).join('') : `<div class="notice good">No out-of-range checks. ${warn.length ? 'A few borderline ones below.' : 'Nice.'}</div>`) +
     (warn.length ? `<details style="margin-top:6px"><summary>${warn.length} borderline (amber)</summary>${warn.map(item).join('')}</details>` : '');
@@ -1336,6 +1408,17 @@ function renderFaults(rec, ev, profile, container) {
     await saveProfile(profile); toast('Tolerance widened 15% for this check. Reset in Calibrate.');
     renderResult(rec, App.player.videoUrl, container); if (App.player) App.player.seek(f.frame);
   });
+}
+function renderShot(rec, ev, container, videoUrl, judgeId) {
+  $$('#shotPills button', container).forEach(b => b.onclick = async () => { rec.shot = rec.shot === b.dataset.shot ? null : b.dataset.shot; await DB.put('history', rec); renderResult(rec, videoUrl, container, judgeId); });
+  const host = $('#shotCauses', container); if (!rec.shot) { host.innerHTML = ''; return; }
+  const info = SHOTS[rec.shot];
+  if (rec.shot === 'good') { host.innerHTML = `<div class="notice good">Nice. ${rec.isRef ? 'This swing is already a reference.' : 'If it also looked good, promote it to a reference swing below.'}</div>`; return; }
+  const found = ev.faults.filter(f => f.kind === 'named' && info.faults.includes(f.id)).sort((a, b) => info.faults.indexOf(a.id) - info.faults.indexOf(b.id));
+  const otherView = info.faults.filter(id => !FAULTS[id].views.includes(rec.view)).map(id => FAULTS[id].name);
+  host.innerHTML = `<div class="notice ${found.length ? '' : 'info'}" style="font-size:14px"><b>${esc(info.label)}</b> — ${esc(info.cause)} <a href="${info.src}" target="_blank" rel="noopener" style="color:var(--pri-text)">Golf Distillery ↗</a><br>
+    ${found.length ? `<b>Likely culprits in this swing:</b> ${found.map(f => `<button class="chip bad" data-jump="${f.frame}" style="margin:3px 2px">${esc(f.title)} ▶</button>`).join('')}` : `None of the usual body causes were detected in this ${VIEW_LABEL[rec.view].toLowerCase()} clip.${otherView.length ? ` The other view would catch: ${otherView.join(', ')}.` : ''} It may be a grip, clubface or ball-position issue the camera can't see.`}</div>`;
+  $$('button[data-jump]', host).forEach(b => b.onclick = () => { App.player.pause(); App.player.seek(+b.dataset.jump); window.scrollTo({ top: 0, behavior: 'smooth' }); });
 }
 function renderCompare(rec, profile, host) {
   const sw = swFromRecord(rec); const n = rec.n; host.innerHTML = '';
@@ -1405,8 +1488,26 @@ async function renderHistory() {
   host.innerHTML = `<div class="card"><div class="row between"><h2>Score trend</h2><select id="histProf" style="width:auto;min-height:38px;padding:6px 30px 6px 10px;font-size:14px">${profOpts}</select></div><div class="trend"><canvas id="trendC"></canvas></div><small class="muted" id="trendNote"></small></div>
     <div class="card" style="padding:6px 12px">${list.map(r => `<div class="item" data-id="${r.id}"><div class="sc ${scoreCls(r.scores && r.scores.overall)}">${r.scores ? r.scores.overall + '%' : '–'}</div><div class="t"><b>${dateStr(r.date)} ${r.isRef ? '⭐' : ''}</b><small>${VIEW_LABEL[r.view]} · ${esc((App.profiles.find(p => p.id === r.profileId) || {}).name || '?')} · ${r.faultCount || 0} fault${r.faultCount === 1 ? '' : 's'}</small></div><span class="muted">›</span></div>`).join('')}</div>`;
   $('#histProf').onchange = e => { App.histFilter = e.target.value || null; renderHistory(); };
+  renderShotInsights(list, host);
   $$('.item[data-id]', host).forEach(el => el.onclick = () => { App.histSel = el.dataset.id; renderHistory(); });
   drawTrend($('#trendC'), list.slice().reverse());
+}
+function renderShotInsights(list, host) {
+  const tagged = list.filter(r => r.shot && r.faultIds);
+  const bad = tagged.filter(r => r.shot !== 'good'), good = tagged.filter(r => r.shot === 'good');
+  const card = document.createElement('div'); card.className = 'card';
+  if (tagged.length < 6 || !bad.length) { card.innerHTML = `<h2>Faults vs results</h2><small class="muted">Tag the shot result on at least 6 swings (${tagged.length} so far) and this will show which body faults actually show up when you mis-hit.</small>`; host.insertBefore(card, host.children[1]); return; }
+  const rows = [];
+  for (const id in FAULTS) {
+    const inBad = bad.filter(r => r.faultIds.includes(id)).length, inGood = good.filter(r => r.faultIds.includes(id)).length;
+    if (!inBad) continue; const pb = inBad / bad.length, pg = good.length ? inGood / good.length : 0;
+    rows.push({ id, pb, pg, lift: pb - pg, inBad, inGood });
+  }
+  rows.sort((a, b) => b.lift - a.lift || b.pb - a.pb);
+  const byShot = {}; for (const r of bad) byShot[r.shot] = (byShot[r.shot] || 0) + 1;
+  card.innerHTML = `<h2>Faults vs results</h2><small class="muted">${bad.length} mis-hits (${Object.keys(byShot).map(k => `${byShot[k]} ${SHOTS[k].label.toLowerCase()}`).join(', ')}) vs ${good.length} good. A fault that appears far more often in mis-hits than in good shots is worth working on first.</small>
+    ${rows.slice(0, 6).map(r => `<div class="kv"><span>${esc(FAULTS[r.id].name)}<br><small>in ${Math.round(r.pb * 100)}% of mis-hits · ${Math.round(r.pg * 100)}% of good shots</small></span><span class="chip ${r.lift > 0.3 ? 'bad' : r.lift > 0.1 ? 'warn' : 'grey'}">${r.lift > 0 ? '+' : ''}${Math.round(r.lift * 100)}%</span></div>`).join('') || '<small class="muted">No named faults detected in mis-hits yet.</small>'}`;
+  host.insertBefore(card, host.children[1]);
 }
 const scoreCls = s => s == null ? '' : s >= 80 ? 'g' : s >= 55 ? 'a' : 'r';
 function drawTrend(c, recs) {
@@ -1522,7 +1623,7 @@ async function renderSettings() {
       <p class="muted" style="font-size:14px"><b>Offline:</b> the pose library and model are cached on this phone after the first analysis, so analysis works without signal. The page itself is served from wherever you host it; ${window.__swOK ? 'a service worker is active, so the page is cached too ✓' : 'to make the page load with no signal at all, host the optional <code>sw.js</code> file next to this HTML file (see the build notes). Without it, iOS usually still opens the installed app from its cache.'}</p>
       <p class="muted" style="font-size:14px"><b>Honest limits:</b> a single phone camera gives 2D joint positions, so turn/X-factor are rough estimates and DTL knee angles are approximate. Use it for trends and clear faults, not launch-monitor precision.</p>
     </div>
-    <div class="card"><small class="muted">SwingCheck · MediaPipe Pose Landmarker ${MP_VER} · no accounts, no servers, no tracking.</small></div>`;
+    <div class="card"><small class="muted">SwingCheck 1.1 · MediaPipe Pose Landmarker ${MP_VER} · fault descriptions and shot-error mapping informed by <a href="https://www.golfdistillery.com" target="_blank" rel="noopener" style="color:var(--pri-text)">Golf Distillery</a> · no accounts, no servers, no tracking.</small></div>`;
   $('#setModel').onchange = e => { S.model = e.target.value; saveSettings(); warmModel().then(renderSettings); };
   $('#setHand').onchange = e => { S.hand = e.target.value; saveSettings(); };
   $('#setFps').onchange = e => { S.fps = +e.target.value; saveSettings(); };
