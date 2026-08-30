@@ -244,6 +244,7 @@ code{background:var(--grey-soft);padding:1px 5px;border-radius:5px;font-size:13p
       </ol>
     </div>
     <label class="btn block" for="fileInput" id="pickBtn">📹 Record or choose a swing video</label>
+    <button class="btn block secondary" id="demoBtn" style="margin-top:10px">Try a demo swing - no club needed</button>
     <input type="file" id="fileInput" accept="video/*" capture="environment" class="hidden">
     <div id="calibHint" class="notice info hidden" style="margin-top:12px"></div>
   </div>
@@ -1419,7 +1420,7 @@ function renderResult(rec, videoUrl, container = an.result, judgeId = null) {
       <div class="score">
         <div class="ring"><canvas id="ringC" width="168" height="168"></canvas><b>${ev.scores.overall}%</b></div>
         <div style="flex:1">
-          <h2>${scoreWord(ev.scores.overall)}</h2>
+          <h2>${scoreWord(ev.scores.overall)}${rec.demo ? ' <span class="chip warn">Demo</span>' : ''}</h2>
           <small>${ev.passed} of ${ev.checks} checks passed · ${VIEW_LABEL[rec.view]} · ${rec.hand === 'R' ? 'Right' : 'Left'}-handed · ${esc(profile.name)}</small><br>
           <small>${nRef >= 3 ? `Compared against <b>your calibrated ranges</b> (${nRef} reference swings)` : (tourSet(rec.view) ? `Compared against the <b>tour model</b> (${tourSet(rec.view).n} GolfDB swings)${nRef ? ` — ${nRef} reference swing${nRef > 1 ? 's' : ''} so far, ${3 - nRef} more switches to your own ranges` : ''}` : '<b>Default ranges</b> — add reference swings in Calibrate to personalise')}</small>
         </div>
@@ -1441,7 +1442,7 @@ function renderResult(rec, videoUrl, container = an.result, judgeId = null) {
       <details><summary>Compare with your reference bands</summary><p class="muted" style="font-size:13px">Blue line = this swing. Green band = your acceptable range (calibrated where available, otherwise default). Vertical lines = phase boundaries.</p><div id="cmpGraphs"></div></details>
     </div>
     <div class="card stack">
-      ${rec.isRef ? `<div class="notice good">This swing is one of your reference swings.</div><button class="btn block ghost" id="unrefBtn">Remove from references</button>` : `<button class="btn block good" id="refBtn">👍 This was a good swing — use as reference</button>`}
+      ${rec.demo ? `<div class="notice info">Demo swing: synthetic data with a deliberate hip sway and chicken wing, so you can explore the app without a club. It cannot be used as a reference.</div>` : rec.isRef ? `<div class="notice good">This swing is one of your reference swings.</div><button class="btn block ghost" id="unrefBtn">Remove from references</button>` : `<button class="btn block good" id="refBtn">👍 This was a good swing — use as reference</button>`}
       <button class="btn block secondary" id="phaseBtn">Adjust phase markers</button>
       ${videoUrl ? `<button class="btn block" id="anotherBtn">Analyse another swing</button>` : ''}
       <small class="muted">Confidence: pose quality ${rec.quality || '–'}%. Turn/X-factor are estimates from single-camera 3D — trust trends more than single numbers.</small>
@@ -1702,8 +1703,10 @@ function tourCoachRecord(view, hand, targetDir) {
   const T = tourSet(view); if (!T || !T.skeleton) return null;
   const lm = [], ranges = {}; let i = 0;
   const mirror = (hand === 'L') !== (view === 'face' && targetDir < 0);
-  for (const p of PHASES) { const s = i; for (const fr of T.skeleton[p]) { lm.push(fr.map(([x, y]) => [0.5 + (mirror ? -x : x) * 0.17, 0.55 + y * 0.17, 0, 1])); i++; } ranges[p] = [s, i - 1]; }
-  return { id: 'tour', lm, ranges, hand: 'R', w: 1, h: 1.2, n: lm.length, fps: 8, view, tour: true };
+  // skeleton coords are in torso-lengths around the address hip centre; map into a 9:16 portrait frame
+  const sy = 0.16, sx = sy * 16 / 9;
+  for (const p of PHASES) { const s = i; for (const fr of T.skeleton[p]) { lm.push(fr.map(([x, y]) => [0.5 + (mirror ? -x : x) * sx, 0.56 + y * sy, 0, 1])); i++; } ranges[p] = [s, i - 1]; }
+  return { id: 'tour', lm, ranges, hand: 'R', w: 9, h: 16, n: lm.length, fps: 8, view, tour: true };
 }
 /* ---------- You vs Coach picker ---------- */
 async function renderCoachPicker(rec, container) {
@@ -1722,6 +1725,66 @@ async function renderCoachPicker(rec, container) {
 }
 
 /* =====================================================================
+   SwingCheck — Demo swing (no club needed): synthetic face-on swing
+   with two deliberate faults (hip sway + chicken wing) so every screen
+   has something real to show. Runs through the full analysis pipeline.
+   ===================================================================== */
+function genDemoFrames() {
+  const fps = 30, T = { addr: 1.0, back: 0.85, down: 0.28, fin: 0.8 };
+  const total = T.addr + T.back + T.down + T.fin; const frames = [];
+  const rnd = () => (Math.random() - 0.5) * 0.003;
+  for (let i = 0; i < Math.floor(total * fps); i++) {
+    const t = i / fps;
+    let u;
+    if (t < T.addr) u = -1 + 0.012 * Math.sin(t * 18);
+    else if (t < T.addr + T.back) u = -1 + (t - T.addr) / T.back;
+    else if (t < T.addr + T.back + T.down) u = (t - T.addr - T.back) / T.down;
+    else u = 1 + (t - T.addr - T.back - T.down) / T.fin * 1.2;
+    const p = Array.from({ length: 33 }, () => [0.5, 0.5, 0, 0.95]);
+    const hipY = 0.55, shY = 0.35, anY = 0.85, kneeY = 0.7, aspect = 9 / 16;
+    const xs = d => 0.5 + d / aspect;
+    // FAULT 1: hip sway — hips (and head) slide away from the target going back
+    const swayNow = u < 0 ? 0.05 * (1 + u) : (u <= 1 ? 0.05 * (1 - u) * 0.6 : 0);
+    p[23] = [xs(0.08 - swayNow), hipY, 0, .95]; p[24] = [xs(-0.08 - swayNow), hipY, 0, .95];
+    const tilt = 0.02;
+    p[11] = [xs(0.12 - tilt - swayNow * 0.7), shY, 0, .95]; p[12] = [xs(-0.12 - tilt - swayNow * 0.7), shY, 0, .95];
+    p[27] = [xs(0.12), anY, 0, .95]; p[28] = [xs(-0.12), anY, 0, .95];
+    p[25] = [xs(0.11 - swayNow * 0.4), kneeY, 0, .95]; p[26] = [xs(-0.11 - swayNow * 0.4), kneeY, 0, .95];
+    p[0] = [xs(-0.02 - swayNow * 0.8), 0.22, 0, .95]; p[7] = [xs(0.03 - swayNow * 0.8), 0.23, 0, .9]; p[8] = [xs(-0.03 - swayNow * 0.8), 0.23, 0, .9];
+    let hx, hy;
+    if (u <= 0) { const a = u + 1; hx = -0.05 - 0.25 * a; hy = 0.72 - 0.5 * a; }
+    else if (u <= 1) { hx = -0.30 + 0.25 * u; hy = 0.22 + 0.5 * u; }
+    else { const a = Math.min(1, u - 1); hx = -0.05 + 0.3 * a; hy = 0.72 - 0.55 * a; }
+    p[15] = [xs(hx + 0.01), hy, 0, .95]; p[16] = [xs(hx - 0.01), hy, 0, .95];
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 0, .95];
+    p[13] = mid(p[11], p[15]); p[14] = mid(p[12], p[16]);
+    if (u > -0.6 && u < 0.7) { p[14][0] += 0.06; p[14][1] += 0.05; }
+    // FAULT 2: chicken wing — lead elbow buckles just after impact
+    if (u > 1 && u < 1.5) { p[13][0] -= 0.045; p[13][1] -= 0.04; }
+    const turn = u <= 0 ? 92 * (1 + u) : u <= 1 ? 92 * (1 - u) - 32 * u : -32 - 60 * Math.min(1, u - 1);
+    const rot = (dg, x2) => [x2 * Math.cos(dg * Math.PI / 180), 0, x2 * Math.sin(dg * Math.PI / 180)];
+    const wl = Array.from({ length: 33 }, () => [0, 0, 0]);
+    wl[11] = rot(turn, 0.2); wl[12] = rot(turn, -0.2); wl[23] = rot(turn * 0.5, 0.12); wl[24] = rot(turn * 0.5, -0.12);
+    for (const q of p) { q[0] += rnd(); q[1] += rnd(); }
+    frames.push({ t, lm: p, wl });
+  }
+  return frames;
+}
+async function runDemo() {
+  try {
+    toast('Building a demo swing (synthetic data, no camera used)...');
+    const cleaned = cleanFrames(genDemoFrames());
+    const sw = computeSwing(cleaned.frames, 720, 1280, 30, { hand: S.hand, view: 'face', det: S.det });
+    if (sw.error) { toast(sw.error, 4000); return; }
+    const rec = makeRecord(sw, cleaned.frames, { fps: 30, w: 720, h: 1280, duration: cleaned.frames.length / 30 }, { isRef: false });
+    rec.demo = true; rec.quality = 95;
+    await DB.put('history', rec);
+    App.curRec = rec; renderResult(rec, null); showAn('result');
+    window.scrollTo(0, 0);
+  } catch (e) { console.error(e); toast('Demo failed: ' + e.message, 4000); }
+}
+
+/* =====================================================================
    SwingCheck — History, Calibrate, Settings, backup, init
    ===================================================================== */
 
@@ -1734,7 +1797,7 @@ async function renderHistory() {
   const profOpts = `<option value="">All profiles</option>` + App.profiles.map(p => `<option value="${p.id}" ${App.histFilter === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
   const list = all.filter(r => !App.histFilter || r.profileId === App.histFilter);
   host.innerHTML = `<div class="card"><div class="row between"><h2>Score trend</h2><select id="histProf" style="width:auto;min-height:38px;padding:6px 30px 6px 10px;font-size:14px">${profOpts}</select></div><div class="trend"><canvas id="trendC"></canvas></div><small class="muted" id="trendNote"></small></div>
-    <div class="card" style="padding:6px 12px">${list.map(r => `<div class="item" data-id="${r.id}"><div class="sc ${scoreCls(r.scores && r.scores.overall)}">${r.scores ? r.scores.overall + '%' : '–'}</div><div class="t"><b>${dateStr(r.date)} ${r.isRef ? '⭐' : ''}</b><small>${VIEW_LABEL[r.view]} · ${esc((App.profiles.find(p => p.id === r.profileId) || {}).name || '?')} · ${r.faultCount || 0} fault${r.faultCount === 1 ? '' : 's'}</small></div><span class="muted">›</span></div>`).join('')}</div>`;
+    <div class="card" style="padding:6px 12px">${list.map(r => `<div class="item" data-id="${r.id}"><div class="sc ${scoreCls(r.scores && r.scores.overall)}">${r.scores ? r.scores.overall + '%' : '–'}</div><div class="t"><b>${dateStr(r.date)} ${r.isRef ? '⭐' : ''}${r.demo ? ' (demo)' : ''}</b><small>${VIEW_LABEL[r.view]} · ${esc((App.profiles.find(p => p.id === r.profileId) || {}).name || '?')} · ${r.faultCount || 0} fault${r.faultCount === 1 ? '' : 's'}</small></div><span class="muted">›</span></div>`).join('')}</div>`;
   $('#histProf').onchange = e => { App.histFilter = e.target.value || null; renderHistory(); };
   renderShotInsights(list, host);
   $$('.item[data-id]', host).forEach(el => el.onclick = () => { App.histSel = el.dataset.id; renderHistory(); });
@@ -1921,6 +1984,7 @@ $('#importInput').addEventListener('change', async e => {
   const hist = await DB.all('history').catch(() => []);
   if (!hist.length) { $('#an-emptyTitle').textContent = 'Record your first swing'; }
   else { const refs = await DB.all('refs').catch(() => []); if (refs.length < 3) { $('#an-emptyTitle').textContent = 'Analyse a swing'; $('#an-emptySub').textContent = `Add ${3 - refs.length} more reference swing${3 - refs.length > 1 ? 's' : ''} to calibrate your own ranges.`; } else { $('#an-emptyTitle').textContent = 'Analyse a swing'; $('#an-emptySub').textContent = 'Your calibrated ranges are active. Keep adding good swings to tighten them.'; } }
+  const db2 = $('#demoBtn'); if (db2) db2.onclick = () => runDemo();
   warmModel();
   window.addEventListener('error', e => console.warn('window error', e.message));
 })();
