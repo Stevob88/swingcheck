@@ -109,6 +109,7 @@ nav#nav button.on{color:var(--pri-dark);background:var(--pri-soft)}
 .player video{object-fit:contain}
 .player canvas{pointer-events:none}
 .player .phaseTag{position:absolute;top:10px;left:10px;background:rgba(255,255,255,.9);color:var(--pri-text);font-weight:700;font-size:13px;padding:4px 10px;border-radius:999px}
+.player .youTag{position:absolute;bottom:10px;left:10px;background:var(--pri);color:#fff;font-weight:700;font-size:12px;padding:3px 9px;border-radius:999px}
 .player .timeTag{position:absolute;top:10px;right:10px;background:rgba(255,255,255,.9);color:var(--txt);font-size:12px;padding:4px 8px;border-radius:999px;font-variant-numeric:tabular-nums}
 .controls{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:10px}
 .controls .iconbtn{width:46px;height:46px}
@@ -138,6 +139,27 @@ nav#nav button.on{color:var(--pri-dark);background:var(--pri-soft)}
 .phaseScores .bar{height:6px;border-radius:3px;background:var(--grey-soft);overflow:hidden;margin-bottom:3px}
 .phaseScores .bar i{display:block;height:100%}
 
+/* Coach analysis table */
+.tabs{display:flex;gap:4px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.tabs button{flex:none;padding:7px 12px;border-radius:999px;font-size:13px;font-weight:600;color:var(--muted);background:var(--grey-soft)}
+.tabs button.on{background:var(--pri);color:#fff}
+.chk{display:grid;grid-template-columns:40px 1fr 74px 22px;align-items:center;gap:6px;padding:11px 2px;border-bottom:1px solid var(--line)}
+.chk:last-child{border-bottom:0}
+.chk .pr{font-weight:700;color:var(--muted);font-size:14px}
+.chk .pr b{display:block;font-size:10px;color:var(--bad);letter-spacing:.02em}
+.chk .lbl{font-size:15px}
+.chk .lbl small{display:block;color:var(--muted);font-size:11.5px}
+.chk .res{font-weight:700;font-size:14px}
+.chk .res.pass{color:#1c7a45}.chk .res.improve{color:var(--bad)}.chk .res.na{color:var(--grey)}
+.chk .chev{color:var(--pri-text);font-size:18px;text-align:right}
+.chk[data-id]{cursor:pointer}
+.legend2{display:flex;gap:14px;font-size:12px;color:var(--muted)}
+.legend2 i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
+.drill{padding:10px 12px;border-radius:12px;background:var(--bg2);margin-top:8px}
+.drill b{display:block;font-size:14px}
+.drill small{display:block;color:var(--muted);margin-top:2px}
+.why{padding:10px 12px;border-radius:12px;background:var(--pri-soft);font-size:13.5px;margin-top:8px}
+.why b{color:var(--pri-text)}
 /* Faults */
 .fault{display:flex;gap:12px;padding:12px;border-radius:14px;background:var(--bad-soft);margin-bottom:8px;border:1px solid #f7cfcc}
 .fault.warn{background:var(--warn-soft);border-color:#f3e0a3}
@@ -895,7 +917,8 @@ function computeSwing(frames, w, h, fps, opts) {
     M.stanceWidth[i] = A.stanceW / A.shoulderW * 100;
   }
   for (const id of ['shoulderTurn', 'hipTurn', 'xFactor']) M[id] = smooth1d(M[id], 2);
-  return { metrics: M, ranges, fps, keys: { t0: keys.t0, t1: keys.t1 ?? null, top: keys.top, impact: keys.impact, fin: keys.fin }, hands, torso, speed: keys.speed, addrY: keys.addrY, topY: keys.topY, peak: keys.peak, view, hand, autoHand, autoView, dirs: { trailDir, targetDir, ballDir, turnSign } };
+  const tempo = (keys.top - keys.t0) / Math.max(1, keys.impact - keys.top);
+  return { metrics: M, ranges, fps, tempo, keys: { t0: keys.t0, t1: keys.t1 ?? null, top: keys.top, impact: keys.impact, fin: keys.fin }, hands, torso, speed: keys.speed, addrY: keys.addrY, topY: keys.topY, peak: keys.peak, view, hand, autoHand, autoView, dirs: { trailDir, targetDir, ballDir, turnSign } };
 }
 
 /* ---------- Resampling for calibration bands ---------- */
@@ -1142,7 +1165,7 @@ class Player {
   constructor(container, rec, videoUrl) {
     this.rec = rec; this.n = rec.lm.length; this.fps = rec.fps; this.idx = 0; this.rate = 1; this.playing = false; this.loopPhase = null; this.videoUrl = videoUrl;
     this.container = container; this.mode = videoUrl ? 'video' : 'skeleton';
-    container.innerHTML = `<div class="player" id="plBox">${videoUrl ? '<video id="plVideo" playsinline muted preload="auto"></video>' : ''}<canvas id="plCanvas"></canvas><div class="phaseTag" id="plPhase"></div><div class="timeTag" id="plTime"></div></div>
+    container.innerHTML = `<div class="row" id="plRow" style="gap:6px;align-items:stretch"><div class="player" id="plBox" style="flex:1">${videoUrl ? '<video id="plVideo" playsinline muted preload="auto"></video>' : ''}<canvas id="plCanvas"></canvas><div class="phaseTag" id="plPhase"></div><div class="timeTag" id="plTime"></div><div class="youTag hidden" id="plYou">You</div></div><div class="player hidden" id="plCoachBox" style="flex:1"><canvas id="plCoachCanvas"></canvas><div class="phaseTag" style="background:var(--good);color:#fff">Coach</div><div class="timeTag" id="plCoachName"></div></div></div>
       <div class="scrubWrap"><div class="scrub" id="plScrub"><div class="track" id="plTrack"></div><div id="plMarks"></div><input type="range" id="plRange" min="0" max="${this.n - 1}" step="1" value="0"></div></div>
       <div class="controls">
         <button class="iconbtn" id="plBack" aria-label="previous frame">‹</button>
@@ -1193,32 +1216,45 @@ class Player {
     const vw = this.rec.w, vh = this.rec.h; const sc = Math.min(this.cw / vw, this.ch / vh); const w = vw * sc, h = vh * sc;
     return { x: (this.cw - w) / 2, y: (this.ch - h) / 2, w, h };
   }
+  setCoach(rec2, name) {
+    this.coach = rec2 || null; this.coachName = name || '';
+    const box = $('#plCoachBox', this.container); box.classList.toggle('hidden', !this.coach); $('#plYou', this.container).classList.toggle('hidden', !this.coach); $('#plTime', this.container).classList.toggle('hidden', !!this.coach);
+    if (this.coach) { this.coachCanvas = $('#plCoachCanvas', this.container); this.coachCtx = this.coachCanvas.getContext('2d'); this.coachSegs = segmentsFor(this.coach.hand); box.style.aspectRatio = this.box.style.aspectRatio; $('#plCoachName', this.container).textContent = this.coachName; }
+    this.resize();
+  }
+  coachIndex() { if (!this.coach) return 0; const { phase, u } = phaseOfFrame(this.rec.ranges, this.idx); const [s, e] = this.coach.ranges[phase]; return clamp(Math.round(s + u * (e - s)), 0, this.coach.lm.length - 1); }
+  drawSkeleton(ctx, r, lm, st, segs, neutral) {
+    const P = i => ({ x: r.x + lm[i][0] * r.w, y: r.y + lm[i][1] * r.h });
+    const lw = Math.max(3, r.w / 120);
+    const order = Object.keys(segs).sort((a, b) => (WORST[st[a] || 'none'] || 0) - (WORST[st[b] || 'none'] || 0));
+    for (const seg of order) {
+      const s = st[seg]; const col = neutral ? neutral : (s ? SEG_COLOR[s] : SEG_COLOR.none);
+      ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 3;
+      for (const [a, b] of segs[seg]) { const A = P(a), B = P(b); ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke(); }
+    }
+    ctx.shadowBlur = 0; ctx.fillStyle = '#fff';
+    for (const i of [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]) { const p = P(i); ctx.beginPath(); ctx.arc(p.x, p.y, lw * 0.9, 0, Math.PI * 2); ctx.fill(); }
+    const le = P(7), re = P(8); const hr = Math.max(6, Math.hypot(le.x - re.x, le.y - re.y) * 0.8);
+    ctx.strokeStyle = neutral ? neutral : (st.head ? SEG_COLOR[st.head] : SEG_COLOR.none); ctx.lineWidth = lw * 0.8; ctx.beginPath(); ctx.arc((le.x + re.x) / 2, (le.y + re.y) / 2 - hr * 0.1, hr, 0, Math.PI * 2); ctx.stroke();
+  }
+  drawBackdrop(ctx, r) { ctx.fillStyle = '#eaf4fb'; ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = '#d5e6f1'; ctx.lineWidth = 1; for (let g = 0; g <= 8; g++) { const y = r.y + r.h * g / 8; ctx.beginPath(); ctx.moveTo(r.x, y); ctx.lineTo(r.x + r.w, y); ctx.stroke(); } }
   draw() {
     const ctx = this.ctx; if (!ctx || !this.cw) return; ctx.clearRect(0, 0, this.cw, this.ch);
     const r = this.contentRect();
-    if (!this.video) { ctx.fillStyle = '#eaf4fb'; ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = '#d5e6f1'; ctx.lineWidth = 1; for (let g = 0; g <= 8; g++) { const y = r.y + r.h * g / 8; ctx.beginPath(); ctx.moveTo(r.x, y); ctx.lineTo(r.x + r.w, y); ctx.stroke(); } }
+    if (!this.video) this.drawBackdrop(ctx, r);
     const lm = this.rec.lm[this.idx]; if (!lm) return;
-    const P = i => ({ x: r.x + lm[i][0] * r.w, y: r.y + lm[i][1] * r.h });
-    const st = this.ev ? this.ev.segStatus[this.idx] : {};
-    const lw = Math.max(3, r.w / 120);
-    // draw segments, grey/neutral first then coloured on top
-    const order = Object.keys(this.segs).sort((a, b) => (WORST[st[a] || 'none'] || 0) - (WORST[st[b] || 'none'] || 0));
-    for (const seg of order) {
-      const s = st[seg]; const col = s ? SEG_COLOR[s] : SEG_COLOR.none;
-      ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 3;
-      for (const [a, b] of this.segs[seg]) { const A = P(a), B = P(b); ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke(); }
-    }
-    ctx.shadowBlur = 0;
-    // joints
-    ctx.fillStyle = '#fff';
-    for (const i of [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]) { const p = P(i); ctx.beginPath(); ctx.arc(p.x, p.y, lw * 0.9, 0, Math.PI * 2); ctx.fill(); }
-    // head circle
-    const nose = P(0), le = P(7), re = P(8); const hr = Math.max(6, Math.hypot(le.x - re.x, le.y - re.y) * 0.8);
-    ctx.strokeStyle = st.head ? SEG_COLOR[st.head] : SEG_COLOR.none; ctx.lineWidth = lw * 0.8; ctx.beginPath(); ctx.arc((le.x + re.x) / 2, (le.y + re.y) / 2 - hr * 0.1, hr, 0, Math.PI * 2); ctx.stroke();
+    this.drawSkeleton(ctx, r, lm, this.ev ? this.ev.segStatus[this.idx] : {}, this.segs, null);
     const ph = phaseOfFrame(this.rec.ranges, this.idx).phase;
     $('#plPhase', this.container).textContent = PHASE_LABEL[ph];
     $('#plTime', this.container).textContent = `${(this.idx / this.fps).toFixed(2)}s · f${this.idx}`;
+    if (this.coach && this.coachCtx) {
+      const cb = this.coachCanvas.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1;
+      if (this.coachCanvas.width !== Math.round(cb.width * dpr)) { this.coachCanvas.width = Math.round(cb.width * dpr); this.coachCanvas.height = Math.round(cb.height * dpr); }
+      const c = this.coachCtx; c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, cb.width, cb.height);
+      const sc = Math.min(cb.width / this.coach.w, cb.height / this.coach.h); const w = this.coach.w * sc, h = this.coach.h * sc; const cr = { x: (cb.width - w) / 2, y: (cb.height - h) / 2, w, h };
+      this.drawBackdrop(c, cr);
+      const clm = this.coach.lm[this.coachIndex()]; if (clm) this.drawSkeleton(c, cr, clm, {}, this.coachSegs, '#2fb36a');
+    }
   }
 }
 
@@ -1318,12 +1354,12 @@ function makeRecord(sw, frames, ext, cur) {
     id: uid(), profileId: App.profile.id, date: Date.now(), view: sw.view, hand: sw.hand, fps: ext.fps, w: ext.w, h: ext.h, duration: ext.duration, n: frames.length,
     lm: frames.map(f => f.lm.map(p => [r3(p[0]), r3(p[1]), r3(p[2]), Math.round(p[3] * 100) / 100])),
     metrics: M, keys: sw.keys, ranges: sw.ranges, dirs: sw.dirs, speedProfile: { addrY: sw.addrY, topY: sw.topY, peak: sw.peak, speed: sw.speed.map(v => Math.round(v * 100) / 100), handsY: sw.hands.y.map(r3) },
-    isRef: !!cur.isRef, refId: null, scores: null
+    tempo: sw.tempo, isRef: !!cur.isRef, refId: null, scores: null
   };
 }
 function swFromRecord(rec) {
   const metrics = {}; for (const m in rec.metrics) metrics[m] = rec.metrics[m].map(v => v == null ? NaN : v);
-  return { metrics, ranges: rec.ranges, keys: rec.keys, view: rec.view, hand: rec.hand, fps: rec.fps, speed: rec.speedProfile && rec.speedProfile.speed };
+  return { metrics, ranges: rec.ranges, keys: rec.keys, view: rec.view, hand: rec.hand, fps: rec.fps, speed: rec.speedProfile && rec.speedProfile.speed, tempo: rec.tempo };
 }
 async function addReference(rec) {
   const sw = swFromRecord(rec);
@@ -1345,7 +1381,7 @@ function renderResult(rec, videoUrl, container = an.result, judgeId = null) {
   const judging = profile !== ownProfile;
   const nRef = refCount(profile, rec.view);
   container.innerHTML = `
-    <div class="card" style="padding:10px"><div id="playerHost"></div></div>
+    <div class="card" style="padding:10px"><div id="playerHost"></div><div id="coachPick" style="padding:6px 4px 0"></div></div>
     <div class="card">
       <div class="score">
         <div class="ring"><canvas id="ringC" width="168" height="168"></canvas><b>${ev.scores.overall}%</b></div>
@@ -1358,6 +1394,7 @@ function renderResult(rec, videoUrl, container = an.result, judgeId = null) {
       <div class="phaseScores">${PHASES.map(p => `<div><b>${ev.scores[p] == null ? '–' : ev.scores[p] + '%'}</b><div class="bar"><i style="width:${ev.scores[p] || 0}%;background:${scoreColor(ev.scores[p])}"></i></div>${PHASE_SHORT[p]}</div>`).join('')}</div>
       ${App.profiles.length > 1 ? `<div class="row between" style="margin-top:12px"><small class="muted">Judge against</small><select id="judgeSel" style="width:auto;min-height:36px;padding:4px 28px 4px 8px;font-size:13px">${App.profiles.map(p => `<option value="${p.id}" ${p.id === profile.id ? 'selected' : ''}>${esc(p.name)}${p.id === rec.profileId ? ' (this swing)' : ''}</option>`).join('')}</select></div>${judging ? `<div class="notice info" style="margin-top:8px;font-size:13px">Scored against <b>${esc(profile.name)}</b> — e.g. a pro profile. Your saved score stays as judged by ${esc(ownProfile.name)}.</div>` : ''}` : ''}
     </div>
+    <div id="coachHost"></div>
     <div class="card">
       <div class="row between"><h2>What did the shot do?</h2>${rec.shot ? `<span class="chip ${rec.shot === 'good' ? 'good' : 'bad'}">${SHOTS[rec.shot].label}</span>` : ''}</div>
       <small class="muted">The app can't see the ball — tag the result and it links your body faults to it.</small>
@@ -1365,8 +1402,7 @@ function renderResult(rec, videoUrl, container = an.result, judgeId = null) {
       <div id="shotCauses" style="margin-top:10px"></div>
     </div>
     <div class="card">
-      <div class="row between"><h2>Faults</h2><span class="chip ${rec.faultCount ? 'bad' : 'good'}">${rec.faultCount ? rec.faultCount + ' found' : 'None found'}</span></div>
-      <div id="faultList" style="margin-top:10px"></div>
+      <details><summary>All measurements (${rec.faultCount ? rec.faultCount + ' out of range' : 'none out of range'})</summary><div id="faultList" style="margin-top:10px"></div></details>
     </div>
     <div class="card">
       <details><summary>Compare with your reference bands</summary><p class="muted" style="font-size:13px">Blue line = this swing. Green band = your acceptable range (calibrated where available, otherwise default). Vertical lines = phase boundaries.</p><div id="cmpGraphs"></div></details>
@@ -1381,6 +1417,8 @@ function renderResult(rec, videoUrl, container = an.result, judgeId = null) {
   App.player = new Player($('#playerHost', container), rec, videoUrl); App.player.setEval(ev);
   drawRing($('#ringC', container), ev.scores.overall);
   renderFaults(rec, ev, profile, container);
+  renderCoach(rec, ev, profile, container, videoUrl, judgeId);
+  renderCoachPicker(rec, container);
   renderShot(rec, ev, container, videoUrl, judgeId);
   const js = $('#judgeSel', container); if (js) js.onchange = e => renderResult(rec, videoUrl, container, e.target.value === rec.profileId ? null : e.target.value);
   renderCompare(rec, profile, $('#cmpGraphs', container));
@@ -1471,6 +1509,167 @@ function openPhaseEditor(rec, videoUrl, container) {
     };
     upd();
   });
+}
+
+/* =====================================================================
+   SwingCheck — Coach layer: plain-English checks, priorities, drills, You-vs-Coach
+   ===================================================================== */
+
+const CHECK_GROUPS = [['all', 'All'], ['setup', 'Set Up'], ['backswing', 'Backswing'], ['downswing', 'Downswing'], ['impact', 'Impact'], ['finish', 'Finish']];
+
+/* Drills: short, do-at-home or at-the-range. Keyed by check id. */
+const DRILLS = {
+  posture: [{ n: 'Wall bend', h: 'Stand a foot from a wall, back to it. Push your backside to the wall, then let the arms hang. That is your address posture — hold it for five slow breaths.', r: '10 reps, at home' }, { n: 'Club down the spine', h: 'Hold a club along your back (head and hips touching). Bow from the hips until the club stays flat while your chest points down at the ball.', r: '10 reps before every session' }],
+  kneeFlex: [{ n: 'Athletic stance', h: 'Set up, then bounce twice on the balls of your feet and settle. Knees should end over the laces, not locked or squatting.', r: 'Every set-up' }],
+  stance: [{ n: 'Heel-width check', h: 'Lay a club across your toes and another inside your heels. For a 7-iron the heels should be about shoulder width; driver a club-width more.', r: '5 set-ups at the range' }],
+  headMovement: [{ n: 'Head against the wall', h: 'Set up with your head lightly touching a wall (no club). Make slow backswings without losing contact.', r: '15 slow swings, at home' }, { n: 'Shadow drill', h: 'Stand with the sun behind you and put a tee where your head\'s shadow falls. Swing to the top without the shadow leaving the tee.', r: '10 swings, range' }],
+  hipSway: [{ n: 'Bag on the hip', h: 'Put your golf bag or a chair just outside your trail hip. Backswing without the hip touching it — the hip turns back, not sideways.', r: '15 swings, range or home' }, { n: 'Trail foot in', h: 'Angle your trail foot in (toes toward the target) — it makes sway almost impossible and teaches the turn.', r: '10 shots' }],
+  shoulderTurn: [{ n: 'Cross-arm turn', h: 'Arms crossed on your chest, address posture. Turn until your lead shoulder is under your chin and your back faces the target. Feel the stretch, then swing with that feeling.', r: '10 reps then 5 shots' }],
+  leadArm: [{ n: 'Wide takeaway', h: 'Push the club away with the lead arm so the clubhead stays far from your body for the first metre of the backswing.', r: '10 slow rehearsals' }],
+  trailKnee: [{ n: 'Hold the flex', h: 'Set up, then someone (or a mirror) checks the trail knee. Swing to the top and freeze — the knee must still be bent and pointing at the ball.', r: '10 swings with a freeze at the top' }],
+  weightTop: [{ n: 'Step drill', h: 'Feet together. Swing back and step the lead foot toward the target as you start down. You cannot reverse-pivot from here.', r: '15 swings, then 5 shots' }, { n: 'Load the trail heel', h: 'At the top you should feel pressure in the trail heel, head behind the ball. Hold that for two seconds.', r: '10 swings with a pause' }],
+  swingLength: [{ n: 'Lead arm parallel', h: 'Backswing only until the lead arm is level with the ground (check in a mirror). Hit balls from there — most people lose nothing.', r: '10 shots' }],
+  xfactor: [{ n: 'Knee-flex coil', h: 'Keep the trail knee flexed while you turn the shoulders as far as they will go. The hips are allowed to turn, just less.', r: '10 slow swings' }],
+  earlyExtension: [{ n: 'Butt on the wall', h: 'Set up with your backside against a wall and swing slowly (no club). Keep contact through impact; the trail cheek replaces the lead cheek.', r: '20 reps a day at home' }, { n: 'Chair behind', h: 'Chair behind your backside at the range. Hit shots without losing contact.', r: '10 shots' }],
+  spineAngle: [{ n: 'Head on the wall', h: 'Head lightly on a wall (no club), make half swings keeping it there through the impact position.', r: '15 reps at home' }],
+  path: [{ n: 'Headcover outside the ball', h: 'Put a headcover just outside and behind the ball. An over-the-top swing hits it; drop the hands and swing out to right field to miss it.', r: '15 shots' }, { n: 'Trail elbow tuck', h: 'Start the downswing by dropping the trail elbow to your side before the hands go anywhere.', r: '10 slow rehearsals' }],
+  lag: [{ n: 'Pump drill', h: 'From the top, pump the hands down to hip height twice keeping the elbow bent, then hit on the third.', r: '10 shots' }, { n: 'Skip the stone', h: 'Rehearse the downswing like skipping a stone side-arm: elbow stays bent and close until the release.', r: '15 rehearsals' }],
+  hipSlide: [{ n: 'Wall by the lead hip', h: 'Something just outside the lead hip. Downswing without hitting it — the hip must turn behind you, not slide.', r: '15 swings' }],
+  weightImpact: [{ n: 'Step-through', h: 'Hit and let the trail foot walk through toward the target after impact. Weight has to be forward to do it.', r: '10 shots' }, { n: 'Lead-foot only', h: 'Chip with the trail foot back on its toe. All weight on the lead side through the strike.', r: '15 chips' }],
+  headImpact: [{ n: 'Tee behind the ball', h: 'Put a tee a hand-width behind the ball and keep your head over that tee through impact.', r: '10 shots' }],
+  leadArmImpact: [{ n: 'Both arms straight', h: 'Slow swings to hip-height finish with both arms straight and the club pointing at the target.', r: '15 reps' }],
+  leadKneeImpact: [{ n: 'Soft lead knee', h: 'Hit half shots keeping a little flex in the lead knee until after the ball, then straighten into the finish.', r: '10 shots' }],
+  hipsOpen: [{ n: 'Belt buckle to target', h: 'Start every downswing by turning the belt buckle toward the target; freeze at impact — buckle should point left of the ball (right-hander).', r: '10 swings with a freeze' }],
+  extension: [{ n: 'Towel under the lead arm', h: 'Glove or towel under the lead armpit. Keep it there through impact and into the follow-through.', r: '15 shots' }],
+  balance: [{ n: 'Hold the finish', h: 'Every shot finishes with weight on the lead foot, trail toe down, held for three seconds. Swing at 80%.', r: 'Every shot this week' }],
+  tempo: [{ n: 'Count 3-to-1', h: 'Say "one-two-three" on the backswing and "one" on the downswing. Most good swings are close to 3:1.', r: '20 swings, then keep counting on the range' }, { n: 'Feet together', h: 'Hit balls with feet together. You cannot rush the transition without falling over.', r: '10 shots' }],
+  speed: [{ n: 'Swoosh past the ball', h: 'Turn the club upside down and make the swoosh sound happen after where the ball would be, not before.', r: '15 swings' }]
+};
+
+/* Checks in the order they appear. Each returns {status:'pass'|'improve'|'na', detail, value, frame}. */
+function buildChecks(ctx) {
+  const { rec, ev, M, R, K, named, sum, view } = ctx;
+  const face = view === 'face', dtl = view === 'dtl';
+  const worst = (m, phases) => { let w = 'na', s = null; for (const p of phases) { const x = sum[m] && sum[m][p]; if (!x) continue; if (WORST[x.status] > WORST[w]) { w = x.status; s = x; } } return { w, s }; };
+  const band = (m, phases) => { const { w, s } = worst(m, phases); if (w === 'na') return { status: 'na' }; if (w === 'bad') return { status: 'improve', value: s.value, range: s.range, frame: s.frame, metric: m, detail: `${METRICS[m].label} was ${fmt1(s.dev)}${METRICS[m].unit} ${s.dir === 'high' ? 'above' : 'below'} your range (${fmt1(s.range.lo)}–${fmt1(s.range.hi)}${METRICS[m].unit}).` }; return { status: 'pass', value: s.value, range: s.range, frame: s.frame, metric: m, detail: `${METRICS[m].label} stayed inside your range (${fmt1(s.range.lo)}–${fmt1(s.range.hi)}${METRICS[m].unit}).` }; };
+  const nf = id => named[id] ? { status: 'improve', frame: named[id].frame, detail: named[id].msg, fault: id } : null;
+  const combine = (...parts) => { const ps = parts.filter(Boolean); const imp = ps.find(p => p.status === 'improve'); if (imp) return imp; const pass = ps.find(p => p.status === 'pass'); return pass || { status: 'na' }; };
+  const C = [];
+  const add = (id, label, group, weight, res, why, sub) => C.push({ id, label, group, weight, why, sub, ...res });
+  // ---- Set Up
+  add('posture', 'Spine angle at address', 'setup', 9, dtl ? band('spineTiltFwd', ['address']) : band('spineTiltSide', ['address']), dtl ? 'A steady forward bend from the hips at address is what lets you return the club to the ball the same way every time. Everything downstream is measured against it.' : 'Face-on, a slight tilt away from the target at address sets the low point of the swing just ahead of the ball.');
+  add('kneeFlex', 'Knee flex', 'setup', 4, combine(band('leadKneeFlex', ['address']), band('trailKneeFlex', ['address'])), 'Soft knees keep you athletic and let the hips turn. Locked knees force a sway; deep knees make you stand up later.');
+  if (face) add('stance', 'Stance width', 'setup', 3, band('stanceWidth', ['address']), 'Too narrow costs balance; too wide restricts the hip turn and encourages sliding.');
+  // ---- Backswing
+  add('headMovement', 'Head movement', 'backswing', 6, face ? band('headSway', ['takeaway', 'backswing', 'top']) : band('headLift', ['takeaway', 'backswing', 'top']), 'Your head is the hub of the swing. If it drifts or lifts going back, the low point moves and you have to time a recovery on the way down.');
+  if (face) add('hipSway', 'Hip sway', 'backswing', 8, combine(nf('sway'), band('hipSway', ['backswing', 'top'])), FAULTS.sway.meaning);
+  add('shoulderTurn', 'Shoulder turn', 'backswing', 5, band('shoulderTurn', ['top']), 'A full turn stores power and gives the downswing time to sequence. Short turns become arms-only swings.', 'estimate');
+  add('leadArm', 'Lead arm width', 'backswing', 4, combine(nf('overSwing'), band('leadArm', ['backswing', 'top'])), 'A comfortably straight lead arm keeps the arc wide and repeatable. A collapsing arm at the top is an over-swing.');
+  if (face) add('trailKnee', 'Trail knee flex', 'backswing', 5, combine(nf('lockedTrailKnee'), band('trailKneeFlex', ['backswing', 'top'])), FAULTS.lockedTrailKnee.meaning);
+  if (face) add('weightTop', 'Weight at the top', 'backswing', 8, combine(nf('reversePivot'), band('weightShift', ['top'])), FAULTS.reversePivot.meaning);
+  add('swingLength', 'Swing length', 'backswing', 4, (nf('shortSwing') || nf('allArms') || { status: named.overSwing ? 'na' : 'pass', detail: 'Backswing length looks normal.' }), 'Length is about control, not power: long enough for a full turn, short enough that the arm stays straight.');
+  add('xfactor', 'Coil (shoulders vs hips)', 'backswing', 4, band('xFactor', ['top']), 'The gap between shoulder and hip turn at the top is stored energy. Too little and you turn as one block; too much strains the back.', 'estimate');
+  // ---- Downswing
+  if (dtl) add('earlyExtension', 'Butt position (early extension)', 'downswing', 10, combine(nf('earlyExtension'), band('hipThrust', ['downswing', 'impact'])), FAULTS.earlyExtension.meaning);
+  if (dtl) add('spineAngle', 'Spine angle kept', 'downswing', 9, combine(nf('lossOfPosture'), band('spineTiltFwd', ['downswing', 'impact'])), FAULTS.lossOfPosture.meaning);
+  if (dtl) add('path', 'Downswing path', 'downswing', 10, combine(nf('overTheTop'), band('handsOut', ['downswing'])), FAULTS.overTheTop.meaning);
+  add('lag', 'Lag (trail elbow)', 'downswing', 8, combine(nf('casting'), band('trailElbow', ['downswing'])), FAULTS.casting.meaning);
+  if (face) add('hipSlide', 'Hip slide', 'downswing', 6, combine(nf('slide'), band('hipSway', ['downswing'])), FAULTS.slide.meaning);
+  // ---- Impact
+  if (face) add('weightImpact', 'Weight forward at impact', 'impact', 8, combine(nf('hangingBack'), band('weightShift', ['impact'])), FAULTS.hangingBack.meaning);
+  if (face) add('headImpact', 'Head behind the ball', 'impact', 5, band('headSway', ['impact']), 'Keeping the head behind the ball at impact lets the club release with the shaft leaning forward, for solid, compressed strikes.');
+  add('leadArmImpact', 'Lead arm at impact', 'impact', 5, band('leadArm', ['impact']), 'A straight lead arm at impact means the arc bottomed out where you set it up. A bent one raises the club and thins the shot.');
+  if (face) add('leadKneeImpact', 'Lead knee at impact', 'impact', 4, combine(nf('lockedLeadKneeImpact'), band('leadKneeFlex', ['impact'])), FAULTS.lockedLeadKneeImpact.meaning);
+  add('hipsOpen', 'Hips open at impact', 'impact', 5, band('hipTurn', ['impact']), 'The hips should already be turned toward the target at impact, making room for the arms. Hips that are square block the club and cause pushes and hooks.', 'estimate');
+  // ---- Finish
+  add('extension', 'Extension through the ball', 'finish', 7, combine(nf('chickenWing'), band('leadArm', ['followthrough'])), FAULTS.chickenWing.meaning);
+  if (face) add('balance', 'Balance at the finish', 'finish', 5, combine(nf('offBalance'), band('weightShift', ['followthrough'])), FAULTS.offBalance.meaning);
+  // ---- Tempo (whole swing)
+  const tempo = rec.tempo;
+  if (isFinite(tempo) && tempo > 0) {
+    const ok = tempo >= 2.3 && tempo <= 3.8;
+    add('tempo', 'Swing tempo', 'all', 7, { status: ok ? 'pass' : 'improve', value: tempo, frame: K.top, detail: `Backswing to downswing ratio was ${tempo.toFixed(1)} : 1 (a repeatable range is about 2.5–3.5 : 1).${tempo < 2.3 ? ' The backswing is rushed or the transition is snatched.' : tempo > 3.8 ? ' The backswing is slow relative to the downswing — usually a slow, deliberate takeaway followed by a hit from the top.' : ''}` }, 'Proper swing tempo makes it easier to hit repeatable solid shots. Tour players cluster near 3:1 whatever their speed; the ratio matters more than the numbers.');
+  }
+  add('speed', 'Speed into impact', 'all', 5, nf('decel') || { status: 'pass', detail: 'Hand speed kept building into the ball.' }, FAULTS.decel.meaning);
+  // priority ordering: improves by weight, then passes by weight
+  const imps = C.filter(c => c.status === 'improve').sort((a, b) => b.weight - a.weight);
+  const rest = C.filter(c => c.status !== 'improve').sort((a, b) => (a.status === 'na') - (b.status === 'na') || b.weight - a.weight);
+  const ordered = imps.concat(rest); ordered.forEach((c, i) => c.priority = i + 1); if (imps.length) imps[0].top = true;
+  return ordered;
+}
+function coachContext(rec, ev) {
+  const named = {}; for (const f of ev.faults) if (f.kind === 'named' && !named[f.id]) named[f.id] = f;
+  return { rec, ev, M: rec.metrics, R: rec.ranges, K: rec.keys, named, sum: ev.summary, view: rec.view };
+}
+function coachSummary(checks, score) {
+  const imps = checks.filter(c => c.status === 'improve'); const groups = {};
+  for (const c of imps) groups[c.group] = (groups[c.group] || 0) + 1;
+  const strong = CHECK_GROUPS.slice(1).map(([g, l]) => ({ g, l, n: checks.filter(c => c.group === g && c.status === 'pass').length, bad: groups[g] || 0 })).filter(x => x.n >= 2 && x.bad === 0).map(x => x.l.toLowerCase());
+  const weak = Object.entries(groups).sort((a, b) => b[1] - a[1]).map(([g]) => (CHECK_GROUPS.find(x => x[0] === g) || ['', 'tempo'])[1].toLowerCase());
+  if (!imps.length) return 'Nothing to fix from this angle — every check passed. Film the other view to complete the picture.';
+  let s = strong.length ? `Your ${strong.slice(0, 2).join(' and ')} ${strong.length > 1 ? 'are' : 'is'} solid. ` : '';
+  s += `${weak.length === 1 ? 'The ' + weak[0] : 'The ' + weak.slice(0, 2).join(' and ')} ${weak.length === 1 ? 'is' : 'are'} where the shots are being lost — ${imps.length} thing${imps.length > 1 ? 's' : ''} to improve, starting with <b>${esc(imps[0].label.toLowerCase())}</b>.`;
+  return s;
+}
+
+/* ---------- Analysis Details card ---------- */
+function renderCoach(rec, ev, profile, container, videoUrl, judgeId) {
+  const host = $('#coachHost', container); if (!host) return;
+  const checks = buildChecks(coachContext(rec, ev)); rec.checks = checks.map(c => ({ id: c.id, status: c.status })); DB.put('history', rec);
+  const imps = checks.filter(c => c.status === 'improve');
+  App.coachTab = App.coachTab || 'all';
+  host.innerHTML = `
+    <div class="card">
+      <div class="row between"><h2>Coach's summary</h2><span class="chip ${imps.length ? 'bad' : 'good'}">${imps.length ? imps.length + ' to improve' : 'All clear'}</span></div>
+      <p style="margin-top:6px">${coachSummary(checks, ev.scores.overall)}</p>
+      ${imps.length ? `<div class="why"><b>Why this matters:</b> ${esc(imps[0].why)}</div>` : ''}
+    </div>
+    <div class="card">
+      <div class="row between"><h2>Analysis details</h2><div class="legend2"><span><i style="background:var(--good)"></i>Pass</span><span><i style="background:var(--bad)"></i>Improve</span></div></div>
+      <div class="tabs" style="margin:10px 0 4px" id="coachTabs">${CHECK_GROUPS.map(([g, l]) => `<button data-g="${g}" class="${App.coachTab === g ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <div class="chk" style="padding:4px 2px 6px;border-bottom:2px solid var(--line)"><small class="muted">Rank</small><small class="muted">Check</small><small class="muted">Result</small><span></span></div>
+      <div id="coachList"></div>
+    </div>
+    ${imps.length ? `<div class="card"><h2>Your practice plan</h2><small class="muted">Fix one thing at a time, highest priority first. Two or three sessions on the top item, then re-film.</small>
+      ${imps.slice(0, 3).map(c => `<div style="margin-top:12px"><div class="row between"><b>${c.priority}. ${esc(c.label)}</b><span class="chip bad">Improve</span></div>${(DRILLS[c.id] || []).slice(0, 2).map(d => `<div class="drill"><b>${esc(d.n)}</b>${esc(d.h)}<small>${esc(d.r)}</small></div>`).join('')}</div>`).join('')}
+      <small class="muted" style="display:block;margin-top:10px">Drills are described from Golf Distillery and common coaching practice — tap a check above for the full explanation and source.</small></div>` : ''}`;
+  const list = $('#coachList', host);
+  const draw = () => {
+    const g = App.coachTab; const rows = checks.filter(c => g === 'all' || c.group === g);
+    list.innerHTML = rows.map(c => `<div class="chk" data-id="${c.id}"><span class="pr">${c.priority}${c.top ? '<b>TOP</b>' : ''}</span><span class="lbl">${esc(c.label)}${c.sub ? `<small>${c.sub === 'estimate' ? 'estimate from 3D pose' : esc(c.sub)}</small>` : ''}</span><span class="res ${c.status}">${c.status === 'pass' ? 'Pass' : c.status === 'improve' ? 'Improve' : 'n/a'}</span><span class="chev">›</span></div>`).join('') || '<small class="muted">No checks in this phase for this camera view.</small>';
+    $$('.chk[data-id]', list).forEach(el => el.onclick = () => openCheck(checks.find(c => c.id === el.dataset.id), rec));
+  };
+  $$('#coachTabs button', host).forEach(b => b.onclick = () => { App.coachTab = b.dataset.g; $$('#coachTabs button', host).forEach(x => x.classList.toggle('on', x === b)); draw(); });
+  draw();
+}
+function openCheck(c, rec) {
+  if (!c) return;
+  const drills = DRILLS[c.id] || []; const src = c.fault && FAULTS[c.fault] && FAULTS[c.fault].src;
+  openSheet(`<div class="row between"><h2>${esc(c.label)}</h2><span class="chip ${c.status === 'pass' ? 'good' : c.status === 'improve' ? 'bad' : 'grey'}">${c.status === 'pass' ? 'Pass' : c.status === 'improve' ? 'Improve' : 'Not checkable'}</span></div>
+    <p style="margin-top:6px">${esc(c.detail || (c.status === 'na' ? 'This check needs the other camera view or the 3D estimate was not available in this clip.' : ''))}</p>
+    <div class="why"><b>Why this matters:</b> ${esc(c.why)}</div>
+    ${c.status !== 'na' && c.frame != null ? `<button class="btn block secondary" id="ckJump" style="margin-top:10px">▶ Show me the moment</button>` : ''}
+    ${c.status === 'improve' && drills.length ? `<h3 style="margin-top:14px">Drills</h3>${drills.map(d => `<div class="drill"><b>${esc(d.n)}</b>${esc(d.h)}<small>${esc(d.r)}</small></div>`).join('')}` : ''}
+    ${src ? `<small class="muted" style="display:block;margin-top:10px">Read more: <a href="${src}" target="_blank" rel="noopener" style="color:var(--pri-text)">Golf Distillery ↗</a></small>` : ''}
+    <button class="btn block ghost" id="ckClose" style="margin-top:12px">Close</button>`, sh => {
+    $('#ckClose', sh).onclick = closeSheet;
+    const j = $('#ckJump', sh); if (j) j.onclick = () => { closeSheet(); if (App.player) { App.player.pause(); App.player.seek(c.frame); } window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  });
+}
+
+/* ---------- You vs Coach picker ---------- */
+async function renderCoachPicker(rec, container) {
+  const host = $('#coachPick', container); if (!host) return;
+  const all = (await DB.all('history')).filter(r => r.id !== rec.id && r.view === rec.view && r.lm && r.lm.length > 10);
+  const cands = all.filter(r => r.isRef).sort((a, b) => ((b.scores && b.scores.overall) || 0) - ((a.scores && a.scores.overall) || 0)).concat(all.filter(r => !r.isRef).sort((a, b) => ((b.scores && b.scores.overall) || 0) - ((a.scores && a.scores.overall) || 0)).slice(0, 5));
+  if (!cands.length) { host.innerHTML = `<small class="muted">Side-by-side "You vs Coach" appears once you have another ${VIEW_LABEL[rec.view].toLowerCase()} swing saved — ideally a reference swing or a pro clip.</small>`; return; }
+  const pname = id => (App.profiles.find(p => p.id === id) || {}).name || '?';
+  host.innerHTML = `<div class="row between"><span style="font-size:14px"><b>Compare</b> <small class="muted">You vs Coach, phase-synced</small></span><button class="toggle ${App.coachOn ? 'on' : ''}" id="coachToggle" type="button" aria-label="compare"></button></div>
+    <select id="coachSel" style="margin-top:8px;${App.coachOn ? '' : 'display:none'}">${cands.map(r => `<option value="${r.id}" ${App.coachId === r.id ? 'selected' : ''}>${r.isRef ? '⭐ ' : ''}${esc(pname(r.profileId))} · ${dateStr(r.date)} · ${r.scores ? r.scores.overall + '%' : '–'}</option>`).join('')}</select>`;
+  const apply = () => { const sel = $('#coachSel', host); const r = cands.find(x => x.id === sel.value) || cands[0]; App.coachId = r.id; if (App.player) App.player.setCoach(App.coachOn ? r : null, App.coachOn ? `${pname(r.profileId)}${r.isRef ? ' ⭐' : ''}` : ''); };
+  $('#coachToggle', host).onclick = () => { App.coachOn = !App.coachOn; $('#coachToggle', host).classList.toggle('on', App.coachOn); $('#coachSel', host).style.display = App.coachOn ? '' : 'none'; apply(); };
+  $('#coachSel', host).onchange = apply;
+  if (App.coachOn) apply();
 }
 
 /* =====================================================================
